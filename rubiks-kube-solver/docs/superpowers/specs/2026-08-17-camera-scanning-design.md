@@ -81,54 +81,73 @@ av prosjektet.
 
 ## Matematisk utledning av U-rotasjon og D-siden
 
+> **Revidert etter nærmere ettersyn** (før implementering ble påbegynt):
+> en tidligere versjon av dette avsnittet beskrev utledningen som "slå opp
+> riktig brikke lokalt, sjelden tvetydig." Ved grundigere gjennomgang viste
+> det seg at et rent lokalt oppslag (2 av 3 kjente farger → 3. farge) *ikke*
+> er generelt entydig — det finnes reelle blandinger der to gjenværende
+> brikker deler samme fargepar, og dette er ikke bare et sjeldent
+> spesialtilfelle å ha en fallback for, det er noe algoritmen må håndtere
+> som en integrert del av design. Avsnittet under beskriver den korrigerte,
+> bevisbart korrekte tilnærmingen. Brukeropplevelsen er uendret (5 bilder,
+> ingen løfting, vilkårlig rotasjon på toppbildet) — dette er en presisering
+> av den interne algoritmen, ikke en endring i hva brukeren opplever.
+
 ### Hvorfor 5 bilder er nok
 
 Hver flis på en uskannet side tilhører enten et hjørne (der de 2 andre
 fargene allerede er observert på sidene) eller en kant (der den ene fargen
-er observert, og den andre må være den uskannede sidens egen — se under).
-Midtflisen er den eneste fargen igjen av de 6 når de andre 5 midtflisene er
-kjent.
+er observert på siden). Midtflisen er den eneste fargen igjen av de 6 når
+de andre 5 midtflisene er kjent.
 
-### Hjørne-utledning (brukes til både D og U-rotasjon)
+### Tilnærming: generer kandidater, valider globalt
 
-For hvert av kubens 8 hjørner er de 3 fargene en fast, kjent kombinasjon
-(f.eks. Hvit+Grønn+Rød er én bestemt fysisk brikke). Når 5 sider er
-fotografert (alt unntatt D), er de 4 øvre hjørnene (UFR, UFL, UBR, UBL) alle
-fullt synlige — vi kjenner deres identitet eksakt. De 4 nedre hjørnene
-(DFR, DFL, DBR, DBL) må da nødvendigvis være nøyaktig de 4 resterende
-brikkene fra det totale settet på 8. For en gitt nedre hjørne-posisjon ser
-vi allerede 2 av dens 3 farger (sidene); vi slår opp hvilken av de
-resterende brikkene som inneholder akkurat det fargeparet, og leser av den
-3. (D-vendte) fargen.
+Fremfor å utlede hver manglende flis uavhengig med lokale regler (som viste
+seg ikke alltid å være entydige), genereres et lite sett kandidat-løsninger
+og den fysisk gyldige kandidaten velges ved global validering — samme
+paritetssjekk som uansett trengs (se "Validering" under). Dette er
+bevisbart korrekt (validering er selve definisjonen av "riktig"), og
+enkelt å teste, fremfor å stole på en håndderivert formel som kan ha
+uoppdagede hull.
 
-**Presisering:** i sjeldne blandinger deler to av de resterende brikkene
-samme fargepar (f.eks. begge inneholder Hvit+Rød, men én har Grønn og den
-andre Blå som 3. farge) — da er det lokalt tvetydig. Se "Validering og
-tvetydighet" for hvordan dette løses.
+Fremgangsmåte:
 
-Kant-flisene på D utledes enklere: av kubens 12 kanter er de 4 som ligger
-helt innenfor F/R/B/L allerede fullt kjent (fullt synlige på sidebildene).
-De resterende 8 (4 mot U, 4 mot D) er dermed nøyaktig de 8 resterende
-kant-brikkene. For en kant mot D ser vi allerede dens side-farge direkte;
-den D-vendte fargen er tvunget til å være D-sidens egen (allerede kjente)
-senterfarge, siden det er den eneste gjenværende kant-brikken som er
-konsistent med den observerte sidefargen på akkurat den posisjonen.
+1. F, R, B, L plasseres direkte — ingen tvetydighet, alle 36 fliser kjent.
+2. U sin midtflis leses direkte av fra det rå U-bildet (midtflisen endres
+   ikke av hvilken av de 4 rotasjonene som er riktig — kun kant- og
+   hjørneflisene på U gjør det).
+3. D sin midtflis er den ene gjenværende fargen av de 6 som ikke brukes av
+   noen av de andre 5 midtflisene (nå alle kjent).
+4. For hver av de 4 mulige 90°-rotasjonene av U-bildets kant-/hjørneceller:
+   a. Plasser U fullstendig ut fra denne rotasjonen — nå er 45 av 54
+      fliser kjent (U+F+R+B+L), og de 4 øvre hjørnene og 4 øvre + 4
+      midtre kantene er alle fullt identifisert (alle sine 2–3 farger
+      direkte observert).
+   b. De 4 gjenværende hjørnebrikkene (blant kubens totalt 8) og de 4
+      gjenværende kantbrikkene (blant totalt 12) er da nøyaktig de som
+      ikke ble brukt i (a) — et fast, lite sett.
+   c. For hver av D sine 4 hjørneposisjoner (2 kjente farger fra sidene)
+      og 4 kantposisjoner (1 kjent farge fra siden): finn hvilke av de
+      gjenværende brikkene som er *konsistente* med de kjente fargene på
+      akkurat den posisjonen (vanligvis nøyaktig én; sjelden to).
+   d. Kombiner til komplette kandidat-kuber — ett gyldig sett tildeler
+      hver gjenværende brikke til nøyaktig én posisjon (et lite
+      tilordningsproblem, i praksis nesten alltid bare 1 kombinasjon per
+      rotasjon siden de fleste posisjoner kun har én konsistent brikke).
+5. For hver kandidat-kube (opptil 4 rotasjoner × noen få
+   tildelings-kombinasjoner hver — i praksis typisk bare 4 totalt, sjelden
+   mer enn noen titalls) kjøres full validering (se under). Nøyaktig én
+   kandidat skal validere som en ekte, løsbar kube; den brukes.
 
-### U-bildets rotasjon
+Dette gir automatisk **både** riktig D-side **og** riktig U-rotasjon fra
+samme mekanisme — ingen separat "sjekk hjørnene mot U-bildet"-logikk
+trengs, siden en feil rotasjon rett og slett ikke vil gi noen gyldig
+kandidat-kube i steg 5.
 
-U fotograferes rett ovenfra, og fotografen kan i praksis stå i en
-vilkårlig retning — bildets "opp" har ingen kjent sammenheng med F/R/B/L.
-Vi kjenner likevel U sine 4 hjørnefarger på forhånd (utledet fra sidene,
-akkurat som for D over). Vi prøver alle 4 mulige 90°-rotasjoner av det
-gjenkjente 3×3-rutenettet fra U-bildet og velger den rotasjonen der
-bildets 4 hjørneceller stemmer overens med de uavhengig utledede
-hjørnefargene. Dermed kan brukeren holde telefonen i hvilken som helst
-retning når toppen fotograferes.
+## Validering
 
-## Validering og tvetydighet
-
-Etter at alle 54 flisene er samlet (5 fotografert + D utledet, U rotert
-riktig):
+Kjøres på hver kandidat-kube fra steg 5 over, og på nytt etter hver manuell
+korrigering:
 
 1. **Antall:** nøyaktig 9 av hver av de 6 fargene.
 2. **Distinkte midtfliser:** alle 6 senterfargene må være forskjellige.
@@ -138,17 +157,16 @@ riktig):
    under implementering; egen paritetssjekk skrives om `cubejs` ikke gir
    et pålitelig svar.
 
-**Tvetydig hjørne-/kant-utledning håndteres slik:** hvis noen posisjoner
-hadde mer enn ett mulig svar under utledningen (sjeldent), prøves
-kombinasjonene av kandidater i rekkefølge inntil steg 3 (paritet) validerer
-— siden kun én kombinasjon noensinne gir en gyldig, løsbar kube. I det
-ekstremt sjeldne tilfellet ingen kombinasjon validerer, ber vi brukeren om
-et 6. bilde (bunnen) som siste utvei, og faller da tilbake til ren
-observasjon i stedet for utledning.
+**Ingen kandidat validerer:** sannsynligvis en feillest farge et sted.
+Brukeren får beskjeden "Fargene stemmer ikke med en ekte kube — sjekk
+rutene" og kan gå tilbake og korrigere et hvilket som helst bilde. Som
+siste utvei (ekstremt sjelden) kan brukeren bli bedt om et 6. bilde
+(bunnen), og appen bruker da ren observasjon der i stedet for utledning.
 
-Feiler validering av andre grunner (feil antall, like midtfliser), vises:
-"Fargene stemmer ikke med en ekte kube — sjekk rutene" — ingen teknisk
-sjargong.
+**Flere kandidater validerer** (kan i teorien skje hvis fargelesingen i seg
+selv var tvetydig nok til å tillate mer enn én fysisk tolkning): den første
+gyldige brukes, siden appen uansett viser alle 6 sidene i
+korrigeringssteget etterpå — brukeren ser og kan rette eventuelle feil der.
 
 ## Manuell korrigering
 
@@ -179,19 +197,18 @@ som et eget steg/overlegg over 3D-scenen.
 - `<input type="file" capture>` faller naturlig tilbake til vanlig
   bildevalg fra galleri hvis enheten ikke har/tillater direkte
   kameratilgang — ingen egen kode trengs for dette.
-- Validering feiler etter alle 5 bilder: se "Validering og tvetydighet"
-  over. Brukeren kan alltid gå tilbake og ta et bilde på nytt for et
-  spesifikt steg.
+- Validering feiler etter alle 5 bilder: se "Validering" over. Brukeren
+  kan alltid gå tilbake og ta et bilde på nytt for et spesifikt steg.
 
 ## Testing
 
 - **Rene, testbare enheter (TDD, samme mønster som `dragResolver.ts`):**
   - Fargeklassifisering (RGB/HSV → nærmeste kubefarge)
-  - Hjørne-/kant-utledning (kjente 5 sider → utledet 6. side, inkludert
-    tvetydighets-fallback)
-  - U-rotasjonsgjenkjenning (rå rutenett + kjente hjørnefarger → riktig
-    rotasjon)
+  - Kandidatgenerering (kjente F/R/B/L + rått U-rutenett → alle
+    kandidat-kuber for de 4 rotasjonene, inkludert flerbrikke-tvetydighet)
   - Validering (antall, distinkte midtfliser, paritet)
+  - Hele utlednings-pipelinen (kandidatgenerering + validering sammen):
+    kjente 5 sider → korrekt 6. side og korrekt U-rotasjon
 - **Integrasjon/E2E (Playwright, samme mønster som drag-testene):**
   bygge syntetiske testbilder (canvas-tegnet, kjente farger på kjente
   posisjoner) og kjøre dem gjennom hele veiviseren, verifisere korrekt
