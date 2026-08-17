@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import SolverWorkerFactory from './solverWorker.ts?worker&inline';
 import type { SolverRequest, SolverResponse } from './solverWorker';
 
 export type SolverStatus = 'initializing' | 'ready' | 'solving';
@@ -14,7 +15,7 @@ const listeners = new Set<Listener>();
 
 function getWorker(): Worker {
   if (!worker) {
-    worker = new Worker(new URL('./solverWorker.ts', import.meta.url), { type: 'module' });
+    worker = new SolverWorkerFactory();
     worker.onmessage = (event: MessageEvent<SolverResponse>) => {
       for (const listener of listeners) listener(event.data);
     };

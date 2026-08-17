@@ -16,9 +16,9 @@ export const STICKER_COLORS: Record<FaceLetter, string> = {
 
 export const INTERIOR_COLOR = '#141414';
 
-type Vec3 = readonly [number, number, number];
+export type Vec3 = readonly [number, number, number];
 
-const FACE_LAYOUT: Record<FaceLetter, { normal: Vec3; u: Vec3; v: Vec3 }> = {
+export const FACE_LAYOUT: Record<FaceLetter, { normal: Vec3; u: Vec3; v: Vec3 }> = {
   U: { normal: [0, 1, 0], u: [1, 0, 0], v: [0, 0, 1] },
   D: { normal: [0, -1, 0], u: [1, 0, 0], v: [0, 0, -1] },
   F: { normal: [0, 0, 1], u: [1, 0, 0], v: [0, -1, 0] },

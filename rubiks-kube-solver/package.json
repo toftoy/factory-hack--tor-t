@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:artifact": "tsc -b && vite build --config vite.artifact.config.ts",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "vitest run",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -27,6 +29,8 @@
     "oxlint": "^1.75.0",
     "patch-package": "^8.0.1",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.10"
   }
 }

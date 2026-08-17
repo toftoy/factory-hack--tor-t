@@ -40,6 +40,7 @@ export function ControlPanel({
       <div>
         <h1>Rubik's kube solver</h1>
         <p className="subtitle">3D Rubik's kube med Kociemba-basert løser</p>
+        <p className="hint">Dra i en rute for å vri det laget selv. Dra utenfor kuben for å rotere kameraet.</p>
       </div>
 
       <div className="button-row">

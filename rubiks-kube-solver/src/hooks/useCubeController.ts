@@ -43,33 +43,43 @@ export function useCubeController() {
     setQueuedCount(0);
   }, []);
 
-  const tick = useCallback((delta: number, turnsPerSecond: number): FrameResult | null => {
-    if (!activeMoveRef.current) {
-      const next = queueRef.current.shift();
-      if (next) {
-        activeMoveRef.current = next;
-        progressRef.current = 0;
-        setActiveMove(next);
-        setQueuedCount(queueRef.current.length);
-      }
-      return null;
-    }
-
-    const move = activeMoveRef.current;
-    progressRef.current = Math.min(1, progressRef.current + delta * turnsPerSecond);
-    const eased = easeInOutQuad(progressRef.current);
-
-    if (progressRef.current >= 1) {
-      activeMoveRef.current = null;
-      cubeRef.current.move(move.notation);
-      setFacelets(cubeRef.current.asString());
-      setMoveCount((count) => count + 1);
-      setActiveMove(null);
-      return { axis: move.axis, angle: move.angle };
-    }
-
-    return { axis: move.axis, angle: move.angle * eased };
+  // Applies one already-decided move to the logical cube and publishes the
+  // resulting state. Shared by the animation-queue tick loop below and by a
+  // manual drag gesture committing the move it resolved on release.
+  const commitMove = useCallback((move: Move) => {
+    cubeRef.current.move(move.notation);
+    setFacelets(cubeRef.current.asString());
+    setMoveCount((count) => count + 1);
   }, []);
+
+  const tick = useCallback(
+    (delta: number, turnsPerSecond: number): FrameResult | null => {
+      if (!activeMoveRef.current) {
+        const next = queueRef.current.shift();
+        if (next) {
+          activeMoveRef.current = next;
+          progressRef.current = 0;
+          setActiveMove(next);
+          setQueuedCount(queueRef.current.length);
+        }
+        return null;
+      }
+
+      const move = activeMoveRef.current;
+      progressRef.current = Math.min(1, progressRef.current + delta * turnsPerSecond);
+      const eased = easeInOutQuad(progressRef.current);
+
+      if (progressRef.current >= 1) {
+        activeMoveRef.current = null;
+        commitMove(move);
+        setActiveMove(null);
+        return { axis: move.axis, angle: move.angle };
+      }
+
+      return { axis: move.axis, angle: move.angle * eased };
+    },
+    [commitMove]
+  );
 
   return {
     facelets,
@@ -79,6 +89,7 @@ export function useCubeController() {
     enqueue,
     reset,
     tick,
+    commitMove,
   };
 }
 
