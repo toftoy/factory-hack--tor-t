@@ -8,6 +8,8 @@ interface Props {
   onScan: () => void;
   onTrain: (track: TrainingTrack) => void;
   isAnimating: boolean;
+  isScanning: boolean;
+  isTraining: boolean;
   isSolved: boolean;
   solverStatus: SolverStatus;
   moveCount: number;
@@ -24,6 +26,8 @@ export function ControlPanel({
   onScan,
   onTrain,
   isAnimating,
+  isScanning,
+  isTraining,
   isSolved,
   solverStatus,
   moveCount,
@@ -32,7 +36,8 @@ export function ControlPanel({
   lastScramble,
   lastSolution,
 }: Props) {
-  const solveDisabled = isAnimating || solverStatus !== 'ready' || isSolved;
+  const otherFeatureActive = isScanning || isTraining;
+  const solveDisabled = isAnimating || otherFeatureActive || solverStatus !== 'ready' || isSolved;
   const solveLabel =
     solverStatus === 'initializing'
       ? 'Initialiserer løser…'
@@ -49,25 +54,25 @@ export function ControlPanel({
       </div>
 
       <div className="button-row">
-        <button onClick={onScramble} disabled={isAnimating}>
+        <button onClick={onScramble} disabled={isAnimating || otherFeatureActive}>
           Bland
         </button>
         <button onClick={onSolve} disabled={solveDisabled}>
           {solveLabel}
         </button>
-        <button onClick={onReset} disabled={isAnimating}>
+        <button onClick={onReset} disabled={isAnimating || otherFeatureActive}>
           Nullstill
         </button>
-        <button onClick={onScan} disabled={isAnimating}>
+        <button onClick={onScan} disabled={isAnimating || isTraining}>
           Skann
         </button>
       </div>
 
       <div className="button-row">
-        <button onClick={() => onTrain('beginner')} disabled={isAnimating}>
+        <button onClick={() => onTrain('beginner')} disabled={isAnimating || isScanning}>
           Tren: Nybegynner
         </button>
-        <button onClick={() => onTrain('oll-pll-2look')} disabled={isAnimating}>
+        <button onClick={() => onTrain('oll-pll-2look')} disabled={isAnimating || isScanning}>
           Tren: 2-look OLL/PLL
         </button>
       </div>

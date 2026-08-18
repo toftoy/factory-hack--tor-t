@@ -67,6 +67,8 @@ export default function App() {
         onScan={scan.start}
         onTrain={training.start}
         isAnimating={controller.isAnimating}
+        isScanning={scan.phase.kind !== 'idle'}
+        isTraining={training.track !== null}
         isSolved={isSolved}
         solverStatus={solverStatus}
         moveCount={controller.moveCount}
