@@ -1900,6 +1900,16 @@ git commit -m "Add scan review/correction screen"
 
 ## Task 13: Wire into `ControlPanel` and `App`
 
+**Revised 2026-08-18** — follows the Task 9/11 correction: `App.tsx`'s
+`ScanWizard` render gate originally only checked `phase.kind ===
+'capturing'`, which would have hidden the wizard entirely during the new
+`'capturingD'` phase (the ~1 in 4 scans needing a 6th photo) — the app
+would look frozen with nothing on screen. Fixed to check both phases;
+`ScanWizard` itself already knows how to render `'capturingD'` internally
+(Task 11), so no other change was needed. Verified against the real
+current `ControlPanel.tsx`/`App.tsx`/`useCubeScan.ts` (via a scratch
+build + `npx tsc -b`, reverted after) before writing this into the plan.
+
 **Files:**
 - Modify: `src/components/ControlPanel.tsx`
 - Modify: `src/App.tsx`
@@ -2015,7 +2025,9 @@ export default function App() {
         lastScramble={lastScramble}
         lastSolution={lastSolution}
       />
-      {scan.phase.kind === 'capturing' && <ScanWizard scan={scan} onCancel={scan.cancel} />}
+      {(scan.phase.kind === 'capturing' || scan.phase.kind === 'capturingD') && (
+        <ScanWizard scan={scan} onCancel={scan.cancel} />
+      )}
       {scan.phase.kind === 'review' && (
         <ScanReview result={scan.phase.result} onUse={handleUseScan} onCancel={scan.cancel} />
       )}
@@ -2033,7 +2045,7 @@ Expected: no type errors, build succeeds.
 
 ```bash
 git add src/components/ControlPanel.tsx src/App.tsx
-git commit -m "Wire the scan wizard and review screen into the app"
+git commit -m "Wire the scan wizard and review screen into the app, including the D-photo fallback"
 ```
 
 ---
