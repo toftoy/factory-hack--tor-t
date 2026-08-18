@@ -43,6 +43,17 @@ export function useCubeController() {
     setQueuedCount(0);
   }, []);
 
+  const loadState = useCallback((initial: string) => {
+    queueRef.current = [];
+    progressRef.current = 0;
+    activeMoveRef.current = null;
+    cubeRef.current = Cube.fromString(initial);
+    setActiveMove(null);
+    setFacelets(initial);
+    setMoveCount(0);
+    setQueuedCount(0);
+  }, []);
+
   // Applies one already-decided move to the logical cube and publishes the
   // resulting state. Shared by the animation-queue tick loop below and by a
   // manual drag gesture committing the move it resolved on release.
@@ -90,6 +101,7 @@ export function useCubeController() {
     reset,
     tick,
     commitMove,
+    loadState,
   };
 }
 
