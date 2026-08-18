@@ -4,6 +4,7 @@ interface Props {
   onScramble: () => void;
   onSolve: () => void;
   onReset: () => void;
+  onScan: () => void;
   isAnimating: boolean;
   isSolved: boolean;
   solverStatus: SolverStatus;
@@ -18,6 +19,7 @@ export function ControlPanel({
   onScramble,
   onSolve,
   onReset,
+  onScan,
   isAnimating,
   isSolved,
   solverStatus,
@@ -52,6 +54,9 @@ export function ControlPanel({
         </button>
         <button onClick={onReset} disabled={isAnimating}>
           Nullstill
+        </button>
+        <button onClick={onScan} disabled={isAnimating}>
+          Skann
         </button>
       </div>
 

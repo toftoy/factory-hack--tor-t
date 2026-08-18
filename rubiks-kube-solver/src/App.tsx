@@ -1,14 +1,18 @@
 import { useCallback, useState } from 'react';
 import { ControlPanel } from './components/ControlPanel';
 import { Scene } from './components/Scene';
+import { ScanReview } from './components/ScanReview';
+import { ScanWizard } from './components/ScanWizard';
 import { SOLVED_STATE } from './cube/facelets';
 import { generateScramble } from './cube/moveEngine';
 import { useSolver } from './cube/useSolver';
 import { useCubeController } from './hooks/useCubeController';
+import { useCubeScan } from './hooks/useCubeScan';
 
 export default function App() {
   const controller = useCubeController();
   const { status: solverStatus, solve } = useSolver();
+  const scan = useCubeScan();
   const [speed, setSpeed] = useState(2.2);
   const [lastScramble, setLastScramble] = useState('');
   const [lastSolution, setLastSolution] = useState('');
@@ -33,6 +37,16 @@ export default function App() {
     setLastSolution('');
   }, [controller]);
 
+  const handleUseScan = useCallback(
+    (facelets: string) => {
+      controller.loadState(facelets);
+      setLastScramble('');
+      setLastSolution('');
+      scan.finish();
+    },
+    [controller, scan]
+  );
+
   const isSolved = controller.facelets === SOLVED_STATE;
 
   return (
@@ -44,6 +58,7 @@ export default function App() {
         onScramble={handleScramble}
         onSolve={handleSolve}
         onReset={handleReset}
+        onScan={scan.start}
         isAnimating={controller.isAnimating}
         isSolved={isSolved}
         solverStatus={solverStatus}
@@ -53,6 +68,12 @@ export default function App() {
         lastScramble={lastScramble}
         lastSolution={lastSolution}
       />
+      {(scan.phase.kind === 'capturing' || scan.phase.kind === 'capturingD') && (
+        <ScanWizard scan={scan} onCancel={scan.cancel} />
+      )}
+      {scan.phase.kind === 'review' && (
+        <ScanReview result={scan.phase.result} onUse={handleUseScan} onCancel={scan.cancel} />
+      )}
     </div>
   );
 }
