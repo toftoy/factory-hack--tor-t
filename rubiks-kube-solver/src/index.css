@@ -279,3 +279,77 @@ input[type='range'] {
   padding: 0;
   cursor: pointer;
 }
+
+.training-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  gap: 12px;
+}
+
+.training-header,
+.training-footer {
+  pointer-events: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.training-case-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.training-case-number {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.training-case-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.training-description,
+.training-hint,
+.training-timing,
+.training-last-result {
+  pointer-events: none;
+  align-self: flex-start;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.training-hint {
+  font-family: monospace;
+  color: var(--text);
+}
+
+.training-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.training-actions {
+  display: flex;
+  gap: 8px;
+}
