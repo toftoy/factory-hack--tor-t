@@ -1533,12 +1533,23 @@ git commit -m "Add draggable grid overlay for scan photo alignment"
 
 ## Task 11: Wizard screen (`ScanWizard.tsx`)
 
+**Revised 2026-08-18** — follows the Task 9 correction: `useCubeScan`'s
+`ScanPhase` now includes a `'capturingD'` phase (requested when the 5-photo
+flow is ambiguous, ~1 in 4 scans). The original version of this component
+only rendered during `phase.kind === 'capturing'` and would have silently
+shown nothing (a blank screen) if a scan ever reached `'capturingD'`. This
+task now renders that phase too, reusing the same capture UI with different
+copy and calling `scan.setDImage`/`scan.confirmD` instead of
+`scan.setStepImage`/`scan.confirmStep`. Verified (this correction) to
+typecheck cleanly against the real `useCubeScan.ts` before being written
+here.
+
 **Files:**
 - Create: `src/components/ScanWizard.tsx`
 
 **Interfaces:**
 - Consumes: `CubeScan` (useCubeScan.ts), `ScanGridOverlay` (Task 10), `GridBounds` (gridSampler.ts).
-- Produces: `<ScanWizard scan={CubeScan} onCancel={() => void} />` — full-screen overlay: step instructions, a hidden `<input type="file">` triggered by a visible "Ta bilde" button, the captured photo drawn to canvas with `ScanGridOverlay` on top, and a "Bekreft" button that samples and advances.
+- Produces: `<ScanWizard scan={CubeScan} onCancel={() => void} />` — full-screen overlay: step instructions, a hidden `<input type="file">` triggered by a visible "Ta bilde" button, the captured photo drawn to canvas with `ScanGridOverlay` on top, and a "Bekreft" button that samples and advances. Also renders the `'capturingD'` fallback step (same layout, different copy) when a scan turns out to be ambiguous.
 
 - [ ] **Step 1: Implement**
 
@@ -1557,6 +1568,9 @@ const STEP_TEXT = [
   'Se rett ned ovenfra. Ta bilde av toppen.',
 ];
 
+const D_STEP_TEXT =
+  'Vi klarte ikke å bestemme bunnen ut ifra de andre bildene. Snu kuben og ta ett bilde til av undersiden.';
+
 interface Props {
   scan: CubeScan;
   onCancel: () => void;
@@ -1568,7 +1582,8 @@ export function ScanWizard({ scan, onCancel }: Props) {
   const [bounds, setBounds] = useState<GridBounds | null>(null);
 
   const phase = scan.phase;
-  const image = phase.kind === 'capturing' ? phase.image : null;
+  const isCapturingD = phase.kind === 'capturingD';
+  const image = phase.kind === 'capturing' ? phase.image : phase.kind === 'capturingD' ? phase.image : null;
 
   useEffect(() => {
     if (!image || !canvasRef.current) return;
@@ -1593,35 +1608,41 @@ export function ScanWizard({ scan, onCancel }: Props) {
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
-        scan.setStepImage(img);
+        if (isCapturingD) {
+          scan.setDImage(img);
+        } else {
+          scan.setStepImage(img);
+        }
         URL.revokeObjectURL(url);
       };
       img.src = url;
     },
-    [scan]
+    [scan, isCapturingD]
   );
 
   const handleConfirm = useCallback(() => {
     if (!canvasRef.current || !bounds) return;
     const ctx = canvasRef.current.getContext('2d')!;
-    scan.confirmStep(ctx, bounds);
+    if (isCapturingD) {
+      scan.confirmD(ctx, bounds);
+    } else {
+      scan.confirmStep(ctx, bounds);
+    }
     setBounds(null);
-  }, [scan, bounds]);
+  }, [scan, bounds, isCapturingD]);
 
-  if (phase.kind !== 'capturing') return null;
+  if (phase.kind !== 'capturing' && phase.kind !== 'capturingD') return null;
 
   return (
     <div className="scan-overlay">
       <div className="scan-header">
-        <span>
-          Steg {scan.stepNumber}/{scan.totalSteps}
-        </span>
+        <span>{phase.kind === 'capturing' ? `Steg ${scan.stepNumber}/${scan.totalSteps}` : 'Ekstra bilde'}</span>
         <button onClick={onCancel} className="scan-close">
           Avbryt
         </button>
       </div>
 
-      <p className="scan-instruction">{STEP_TEXT[phase.stepIndex]}</p>
+      <p className="scan-instruction">{phase.kind === 'capturing' ? STEP_TEXT[phase.stepIndex] : D_STEP_TEXT}</p>
 
       <div className="scan-photo-area">
         {image ? (
@@ -1644,9 +1665,7 @@ export function ScanWizard({ scan, onCancel }: Props) {
       />
 
       <div className="scan-actions">
-        <button onClick={() => fileInputRef.current?.click()}>
-          {image ? 'Ta nytt bilde' : 'Ta bilde'}
-        </button>
+        <button onClick={() => fileInputRef.current?.click()}>{image ? 'Ta nytt bilde' : 'Ta bilde'}</button>
         {image && <button onClick={handleConfirm}>Bekreft</button>}
       </div>
     </div>
@@ -1742,7 +1761,7 @@ Expected: no type errors.
 
 ```bash
 git add src/components/ScanWizard.tsx src/index.css
-git commit -m "Add scan wizard screen: instructions, capture, grid alignment"
+git commit -m "Add scan wizard screen: instructions, capture, grid alignment, D-photo fallback"
 ```
 
 ---
