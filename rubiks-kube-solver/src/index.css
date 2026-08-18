@@ -234,3 +234,29 @@ input[type='range'] {
   display: flex;
   gap: 8px;
 }
+
+.scan-review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 12px;
+  justify-content: center;
+  align-content: center;
+  flex: 1;
+}
+
+.scan-review-face {
+  display: grid;
+  grid-template-columns: repeat(3, 22px);
+  grid-template-rows: repeat(3, 22px);
+  gap: 2px;
+  padding: 4px;
+  background: var(--panel-border);
+  border-radius: 4px;
+}
+
+.scan-review-cell {
+  border: none;
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+}
