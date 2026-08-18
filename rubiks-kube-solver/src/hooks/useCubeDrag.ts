@@ -145,7 +145,17 @@ export function useCubeDrag(controller: CubeController, onGrabbingChange: (grabb
           endDrag();
           return;
         }
-        drag.locked = { screenAxis: useU ? drag.screenU : drag.screenV, referenceMove };
+        // Signed so that continuing to drag in the SAME direction as this initial
+        // lock-crossing keeps producing referenceMove un-inverted (quarterTurns
+        // growing positive). Storing the raw unsigned screenU/screenV here would
+        // make quarterTurns' sign always equal `sign`, and since moveFromQuarterTurns
+        // inverts on a negative quarterTurns, that double-negates: resolveGrabMove(sign)
+        // inverted back to resolveGrabMove(+1) regardless of `sign` - i.e. a whole
+        // straight drag could only ever commit each face's single fixed modifier
+        // (always U'/R'/F', never plain; always L/D/B, never their primes),
+        // regardless of which way the user actually dragged.
+        const rawAxis = useU ? drag.screenU : drag.screenV;
+        drag.locked = { screenAxis: { x: rawAxis.x * sign, y: rawAxis.y * sign }, referenceMove };
         setManualLayer({ axis: referenceMove.axis, layer: referenceMove.layer });
       }
 
