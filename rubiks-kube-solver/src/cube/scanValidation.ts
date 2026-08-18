@@ -24,7 +24,7 @@ export function validateScan(facelets: string): ValidationResult {
   }
 
   const centers = FACE_ORDER.map((_, i) => facelets[i * 9 + 4]);
-  if (new Set(centers).size !== 6) return { valid: false, reason: 'duplicate-centers' };
+  if (centers.some((c, i) => c !== FACE_ORDER[i])) return { valid: false, reason: 'duplicate-centers' };
 
   if (!hasValidParity(facelets)) return { valid: false, reason: 'invalid-parity' };
 
