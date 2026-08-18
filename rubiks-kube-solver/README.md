@@ -21,6 +21,10 @@ two-phase-algoritme, med animerte trekk i 3D.
   kuben løftes aldri) og få tilstanden lastet inn direkte — se
   `docs/superpowers/specs/2026-08-17-camera-scanning-design.md` for
   hvordan bunnen og toppens retning regnes ut fra bare 5 bilder.
+- **Tren på algoritmer**: øv på navngitte kube-algoritmer (nybegynnermetode
+  eller 2-look OLL/PLL) direkte på 3D-kuben — appen setter opp et kjent
+  case, du løser det selv ved å dra i lag, og appen tar tid og styrer
+  fremgang med et 3-på-rad-krav for å låse opp neste algoritme.
 
 ## Kom i gang
 
@@ -69,6 +73,12 @@ npm run preview        # server produksjonsbygget lokalt
   tilstandsmaskinen for skanne-veiviseren; `src/components/ScanWizard.tsx`,
   `ScanGridOverlay.tsx` og `ScanReview.tsx` er UI-et for fotografering,
   det justerbare rutenett-overlayet og manuell retting før tilstanden tas i bruk
+- `src/cube/algorithms.ts`, `trainingProgress.ts` – algoritme-data
+  (nybegynner + 2-look OLL/PLL, selv-verifisert til å rundtrippe til løst
+  tilstand) og ren fremgangslogikk (streak, mestring, lagret peker) for
+  algoritmetrening. `src/hooks/useAlgorithmTraining.ts` er
+  tilstandsmaskinen; `src/components/TrainingWizard.tsx` er HUD-en som
+  ligger over den eksisterende 3D-visningen uten å blokkere den.
 
 Kubens logiske tilstand holdes alltid som en 54-tegns facelet-streng. Under en
 trekk-animasjon (automatisk eller manuell) rendres kun det aktive laget i en
