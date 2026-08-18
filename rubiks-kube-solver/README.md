@@ -17,6 +17,10 @@ two-phase-algoritme, med animerte trekk i 3D.
   Web Worker slik at UI-et aldri fryser
 - Jevnt animerte lag-rotasjoner med justerbar hastighet
 - Trekktelling og logg over siste blanding/løsning
+- **Skann en ekte kube**: fotografer en fysisk, blandet kube (5 bilder,
+  kuben løftes aldri) og få tilstanden lastet inn direkte — se
+  `docs/superpowers/specs/2026-08-17-camera-scanning-design.md` for
+  hvordan bunnen og toppens retning regnes ut fra bare 5 bilder.
 
 ## Kom i gang
 
@@ -57,6 +61,14 @@ npm run preview        # server produksjonsbygget lokalt
 - `src/components/` – `Scene` (Canvas/lys/kamera/OrbitControls), `RubiksCube`
   (animasjonsløkke via `useFrame` + pointer-håndtak på hver kubie), `Cubie`
   (enkelt kubie-mesh), `ControlPanel` (UI)
+- `src/cube/colorClassifier.ts`, `gridSampler.ts`, `scanInference.ts`,
+  `scanAssembly.ts`, `scanValidation.ts` – ren logikk for å skanne en ekte
+  kube fra 5 (eller unntaksvis 6) bilder: fargeklassifisering av rutene,
+  utledning av bunnens/toppens retning, sammenstilling til en full
+  facelet-streng og gyldighetssjekk (paritet). `src/hooks/useCubeScan.ts` er
+  tilstandsmaskinen for skanne-veiviseren; `src/components/ScanWizard.tsx`,
+  `ScanGridOverlay.tsx` og `ScanReview.tsx` er UI-et for fotografering,
+  det justerbare rutenett-overlayet og manuell retting før tilstanden tas i bruk
 
 Kubens logiske tilstand holdes alltid som en 54-tegns facelet-streng. Under en
 trekk-animasjon (automatisk eller manuell) rendres kun det aktive laget i en
