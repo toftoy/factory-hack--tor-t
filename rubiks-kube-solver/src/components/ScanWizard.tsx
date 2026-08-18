@@ -99,7 +99,14 @@ export function ScanWizard({ scan, onCancel }: Props) {
             }}
           >
             <canvas ref={canvasRef} className="scan-canvas" />
-            {bounds && <ScanGridOverlay bounds={bounds} onChange={setBounds} />}
+            {bounds && canvasRef.current && (
+              <ScanGridOverlay
+                bounds={bounds}
+                onChange={setBounds}
+                canvasWidth={canvasRef.current.width}
+                canvasHeight={canvasRef.current.height}
+              />
+            )}
           </div>
         ) : (
           <div className="scan-placeholder">Ingen bilde ennå</div>

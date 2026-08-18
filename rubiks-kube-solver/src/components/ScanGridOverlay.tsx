@@ -4,9 +4,11 @@ import type { GridBounds } from '../cube/gridSampler';
 interface Props {
   bounds: GridBounds;
   onChange: (bounds: GridBounds) => void;
+  canvasWidth: number;
+  canvasHeight: number;
 }
 
-export function ScanGridOverlay({ bounds, onChange }: Props) {
+export function ScanGridOverlay({ bounds, onChange, canvasWidth, canvasHeight }: Props) {
   const dragRef = useRef<{ mode: 'move' | 'resize'; startX: number; startY: number; start: GridBounds } | null>(
     null
   );
@@ -47,7 +49,12 @@ export function ScanGridOverlay({ bounds, onChange }: Props) {
   ]);
 
   return (
-    <svg className="scan-grid-overlay" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    <svg
+      className="scan-grid-overlay"
+      viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
       <rect
         x={bounds.x}
         y={bounds.y}
