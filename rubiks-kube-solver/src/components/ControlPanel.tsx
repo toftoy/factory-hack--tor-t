@@ -1,10 +1,12 @@
 import type { SolverStatus } from '../cube/useSolver';
+import type { TrainingTrack } from '../cube/algorithms';
 
 interface Props {
   onScramble: () => void;
   onSolve: () => void;
   onReset: () => void;
   onScan: () => void;
+  onTrain: (track: TrainingTrack) => void;
   isAnimating: boolean;
   isSolved: boolean;
   solverStatus: SolverStatus;
@@ -20,6 +22,7 @@ export function ControlPanel({
   onSolve,
   onReset,
   onScan,
+  onTrain,
   isAnimating,
   isSolved,
   solverStatus,
@@ -57,6 +60,15 @@ export function ControlPanel({
         </button>
         <button onClick={onScan} disabled={isAnimating}>
           Skann
+        </button>
+      </div>
+
+      <div className="button-row">
+        <button onClick={() => onTrain('beginner')} disabled={isAnimating}>
+          Tren: Nybegynner
+        </button>
+        <button onClick={() => onTrain('oll-pll-2look')} disabled={isAnimating}>
+          Tren: 2-look OLL/PLL
         </button>
       </div>
 

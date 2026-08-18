@@ -3,19 +3,27 @@ import { ControlPanel } from './components/ControlPanel';
 import { Scene } from './components/Scene';
 import { ScanReview } from './components/ScanReview';
 import { ScanWizard } from './components/ScanWizard';
+import { TrainingWizard } from './components/TrainingWizard';
 import { SOLVED_STATE } from './cube/facelets';
 import { generateScramble } from './cube/moveEngine';
 import { useSolver } from './cube/useSolver';
 import { useCubeController } from './hooks/useCubeController';
 import { useCubeScan } from './hooks/useCubeScan';
+import { useAlgorithmTraining } from './hooks/useAlgorithmTraining';
 
 export default function App() {
   const controller = useCubeController();
   const { status: solverStatus, solve } = useSolver();
   const scan = useCubeScan();
+  const training = useAlgorithmTraining(controller);
   const [speed, setSpeed] = useState(2.2);
   const [lastScramble, setLastScramble] = useState('');
   const [lastSolution, setLastSolution] = useState('');
+
+  const clearLogs = useCallback(() => {
+    setLastScramble('');
+    setLastSolution('');
+  }, []);
 
   const handleScramble = useCallback(() => {
     const algorithm = generateScramble(20);
@@ -33,18 +41,16 @@ export default function App() {
 
   const handleReset = useCallback(() => {
     controller.reset();
-    setLastScramble('');
-    setLastSolution('');
-  }, [controller]);
+    clearLogs();
+  }, [controller, clearLogs]);
 
   const handleUseScan = useCallback(
     (facelets: string) => {
       controller.loadState(facelets);
-      setLastScramble('');
-      setLastSolution('');
+      clearLogs();
       scan.finish();
     },
-    [controller, scan]
+    [controller, scan, clearLogs]
   );
 
   const isSolved = controller.facelets === SOLVED_STATE;
@@ -59,6 +65,7 @@ export default function App() {
         onSolve={handleSolve}
         onReset={handleReset}
         onScan={scan.start}
+        onTrain={training.start}
         isAnimating={controller.isAnimating}
         isSolved={isSolved}
         solverStatus={solverStatus}
@@ -79,6 +86,7 @@ export default function App() {
           onCancel={scan.cancel}
         />
       )}
+      {training.track && <TrainingWizard training={training} onExit={training.stop} />}
     </div>
   );
 }
