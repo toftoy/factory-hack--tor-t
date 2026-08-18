@@ -64,6 +64,45 @@ describe('assembleScan', () => {
   });
 });
 
+describe('assembleScan orientation independence', () => {
+  test('recovers the original state (or honestly reports ambiguous) regardless of which side the user started with', () => {
+    const yRotations = ["y", "y'", 'y2'] as const;
+    for (let i = 0; i < 20; i++) {
+      const original = Cube.random().asString();
+      // Simulate the user physically starting the scan with a different
+      // side facing them: whole-cube-rotate around the vertical axis, then
+      // capture F/R/B/L/U off the ROTATED cube, exactly as a real scan
+      // would if the user hadn't started with the "canonical" side facing
+      // them. assembleScan must still recover the ORIGINAL (pre-rotation)
+      // facelets string, since a whole-cube rotation doesn't change which
+      // physical cube state it is.
+      const rotated = Cube.fromString(original);
+      const yMove = yRotations[Math.floor(Math.random() * yRotations.length)];
+      rotated.move(yMove);
+      const rotatedFacelets = rotated.asString();
+
+      const uRotation = Math.floor(Math.random() * 4);
+      const sides = {
+        F: blockOf(rotatedFacelets, 'F'),
+        R: blockOf(rotatedFacelets, 'R'),
+        B: blockOf(rotatedFacelets, 'B'),
+        L: blockOf(rotatedFacelets, 'L'),
+        U: rotateGrid(blockOf(rotatedFacelets, 'U'), uRotation),
+      };
+
+      const result = assembleScan(sides);
+      if (result.ok) {
+        expect(result.facelets).toBe(original);
+      } else {
+        // Never a wrong ok:true, and never the unrelated
+        // 'no-valid-candidate' reason - the only acceptable non-exact
+        // outcome is an honest 'ambiguous'.
+        expect(result.reason).toBe('ambiguous');
+      }
+    }
+  });
+});
+
 describe('resolveAmbiguousScan', () => {
   test.each([0, 1, 2, 3])('recovers the exact original from the known-ambiguous fixture with D-photo rotation %i', (dRotation) => {
     const facelets = 'UDUFUBLUURLBFRDFLFDBFFFDDLLRUDRDFUUDBRBBLULDBLBRLBRRRF';

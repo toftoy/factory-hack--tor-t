@@ -8,13 +8,14 @@ const COLOR_CYCLE: FaceLetter[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
 interface Props {
   result: AssembleResult;
+  capturedFacelets: string | null;
   onUse: (facelets: string) => void;
   onCancel: () => void;
 }
 
-export function ScanReview({ result, onUse, onCancel }: Props) {
-  const [facelets, setFacelets] = useState(() =>
-    result.ok ? result.facelets : 'U'.repeat(54)
+export function ScanReview({ result, capturedFacelets, onUse, onCancel }: Props) {
+  const [facelets, setFacelets] = useState(
+    () => (result.ok ? result.facelets : capturedFacelets) ?? 'U'.repeat(54)
   );
 
   const validation = validateScan(facelets);

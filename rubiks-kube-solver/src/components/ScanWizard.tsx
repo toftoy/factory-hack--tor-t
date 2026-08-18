@@ -4,7 +4,7 @@ import type { GridBounds } from '../cube/gridSampler';
 import { ScanGridOverlay } from './ScanGridOverlay';
 
 const STEP_TEXT = [
-  'Ta bilde av siden som ser på deg.',
+  'Legg kuben på bordet med hvit side opp. Ta bilde av siden som ser på deg.',
   'Snu en gang til høyre. Ta bilde.',
   'Snu en gang til høyre. Ta bilde.',
   'Snu en gang til høyre. Ta bilde.',

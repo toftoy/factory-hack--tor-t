@@ -72,7 +72,12 @@ export default function App() {
         <ScanWizard scan={scan} onCancel={scan.cancel} />
       )}
       {scan.phase.kind === 'review' && (
-        <ScanReview result={scan.phase.result} onUse={handleUseScan} onCancel={scan.cancel} />
+        <ScanReview
+          result={scan.phase.result}
+          capturedFacelets={scan.capturedFacelets}
+          onUse={handleUseScan}
+          onCancel={scan.cancel}
+        />
       )}
     </div>
   );
