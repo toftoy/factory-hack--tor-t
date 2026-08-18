@@ -863,18 +863,32 @@ git commit -m "Add self-contained cube-validity (parity) check for scans"
 
 ## Task 6: Orchestrator (`scanAssembly.ts`)
 
+**Revised 2026-08-18** — the original version of this task assumed picking
+the first `validateScan`-passing candidate always recovers the true cube.
+That assumption was wrong: measured directly against the real Task 4/5
+implementations, **~27% of random scrambled cubes have 2+ different, both
+fully valid, real cube states consistent with the same 5 photos** (F/R/B/L
+fully known, U known up to rotation) — an information-theoretic fact, not a
+bug in Task 4 or 5 (both were independently re-verified correct in their own
+task reviews). Confirmed with the user: on ambiguity, fall back to a 6th
+photo (the D/bottom face, any rotation — the one case where the cube *is*
+lifted) rather than silently guessing. This task now produces two functions
+instead of one.
+
 **Files:**
 - Create: `src/cube/scanAssembly.ts`
 - Test: `src/cube/scanAssembly.test.ts`
 
 **Interfaces:**
-- Consumes: `generateScanCandidates`, `KnownSides` (scanInference.ts); `validateScan` (scanValidation.ts).
-- Produces: `AssembleResult = { ok: true; facelets: string } | { ok: false; reason: string }`, `assembleScan(sides: KnownSides): AssembleResult`.
+- Consumes: `generateScanCandidates`, `rotateGrid`, `KnownSides` (scanInference.ts); `validateScan` (scanValidation.ts); `FACE_ORDER` (facelets.ts).
+- Produces:
+  - `AssembleResult = { ok: true; facelets: string } | { ok: false; reason: 'no-valid-candidate' | 'ambiguous' }`
+  - `assembleScan(sides: KnownSides): AssembleResult` — tries the 5-photo pipeline; returns `ambiguous` (not a guess) when 2+ valid candidates exist.
+  - `resolveAmbiguousScan(sides: KnownSides, dPhoto: FaceGrid): AssembleResult` — called after the caller collects a 6th photo; all 54 stickers are then known modulo 2 unresolved photo rotations (U and D), so no backtracking is needed — tries all 16 rotation combinations directly and validates.
 
 This is the full pipeline end to end — the strongest correctness proof for
 the whole feature's math, since it runs actual `cubejs`-generated scrambles
-through candidate generation *and* validation together and demands an
-exact round trip.
+through candidate generation *and* validation together.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -882,7 +896,7 @@ exact round trip.
 // src/cube/scanAssembly.test.ts
 import { describe, expect, test } from 'vitest';
 import Cube from 'cubejs';
-import { assembleScan } from './scanAssembly';
+import { assembleScan, resolveAmbiguousScan } from './scanAssembly';
 import { rotateGrid } from './scanInference';
 import { FACE_ORDER } from './facelets';
 import type { FaceLetter } from './moveEngine';
@@ -894,19 +908,41 @@ function blockOf(facelets: string, face: FaceLetter): FaceGrid {
 }
 
 describe('assembleScan', () => {
-  test('recovers the exact original state for 10 random scrambles, any U rotation', () => {
-    for (let i = 0; i < 10; i++) {
+  test('recovers the exact original state, or correctly reports ambiguous, for 20 random scrambles', () => {
+    for (let i = 0; i < 20; i++) {
       const facelets = Cube.random().asString();
       const rotation = Math.floor(Math.random() * 4);
-      const result = assembleScan({
+      const sides = {
         F: blockOf(facelets, 'F'),
         R: blockOf(facelets, 'R'),
         B: blockOf(facelets, 'B'),
         L: blockOf(facelets, 'L'),
         U: rotateGrid(blockOf(facelets, 'U'), rotation),
-      });
-      expect(result).toEqual({ ok: true, facelets });
+      };
+      const result = assembleScan(sides);
+      if (result.ok) {
+        expect(result.facelets).toBe(facelets);
+      } else {
+        // Ambiguity is an expected, correct outcome for some scrambles (not
+        // a failure) — assert it's reported as such, never a silent wrong
+        // guess or the unrelated 'no-valid-candidate' reason.
+        expect(result.reason).toBe('ambiguous');
+      }
     }
+  });
+
+  test('a known-ambiguous fixed state is reported as ambiguous, not silently resolved', () => {
+    // Captured from a real Cube.random() draw during investigation: this
+    // exact state has 2 different valid completions for the same 5 photos.
+    const facelets = 'UDUFUBLUURLBFRDFLFDBFFFDDLLRUDRDFUUDBRBBLULDBLBRLBRRRF';
+    const result = assembleScan({
+      F: blockOf(facelets, 'F'),
+      R: blockOf(facelets, 'R'),
+      B: blockOf(facelets, 'B'),
+      L: blockOf(facelets, 'L'),
+      U: blockOf(facelets, 'U'),
+    });
+    expect(result).toEqual({ ok: false, reason: 'ambiguous' });
   });
 
   test('reports failure when a color was misread badly enough to be unrecoverable', () => {
@@ -920,7 +956,22 @@ describe('assembleScan', () => {
       L: blockOf(facelets, 'L'),
       U: brokenU,
     });
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: false, reason: 'no-valid-candidate' });
+  });
+});
+
+describe('resolveAmbiguousScan', () => {
+  test.each([0, 1, 2, 3])('recovers the exact original from the known-ambiguous fixture with D-photo rotation %i', (dRotation) => {
+    const facelets = 'UDUFUBLUURLBFRDFLFDBFFFDDLLRUDRDFUUDBRBBLULDBLBRLBRRRF';
+    const sides = {
+      F: blockOf(facelets, 'F'),
+      R: blockOf(facelets, 'R'),
+      B: blockOf(facelets, 'B'),
+      L: blockOf(facelets, 'L'),
+      U: blockOf(facelets, 'U'),
+    };
+    const dPhoto = rotateGrid(blockOf(facelets, 'D'), dRotation);
+    expect(resolveAmbiguousScan(sides, dPhoto)).toEqual({ ok: true, facelets });
   });
 });
 ```
@@ -934,34 +985,89 @@ Expected: FAIL — `Cannot find module './scanAssembly'`
 
 ```ts
 // src/cube/scanAssembly.ts
-import { generateScanCandidates, type KnownSides } from './scanInference';
+import { generateScanCandidates, rotateGrid, type KnownSides } from './scanInference';
 import { validateScan } from './scanValidation';
+import { FACE_ORDER } from './facelets';
+import type { FaceLetter } from './moveEngine';
+import type { FaceGrid } from './scanTypes';
 
-export type AssembleResult = { ok: true; facelets: string } | { ok: false; reason: string };
+export type AssembleResult =
+  | { ok: true; facelets: string }
+  | { ok: false; reason: 'no-valid-candidate' | 'ambiguous' };
 
+/**
+ * Assembles a full 54-char facelet string from 5 known side photos (F/R/B/L
+ * fully known, U known up to an unresolved rotation). Multiple different
+ * real cube states can share the same 5 photos (~1 in 4 scrambled cubes, by
+ * measurement) — reported as 'ambiguous' rather than silently guessed, so
+ * the caller can fall back to `resolveAmbiguousScan` with a 6th (D) photo.
+ */
 export function assembleScan(sides: KnownSides): AssembleResult {
   const candidates = generateScanCandidates(sides);
-  for (const candidate of candidates) {
-    if (validateScan(candidate).valid) {
-      return { ok: true, facelets: candidate };
+  const valid = [...new Set(candidates.filter((c) => validateScan(c).valid))];
+  if (valid.length === 1) return { ok: true, facelets: valid[0] };
+  if (valid.length === 0) return { ok: false, reason: 'no-valid-candidate' };
+  return { ok: false, reason: 'ambiguous' };
+}
+
+function buildFacelets(blocks: Record<FaceLetter, FaceGrid>): string {
+  const facelets: FaceLetter[] = new Array(54);
+  for (const face of FACE_ORDER) {
+    const start = FACE_ORDER.indexOf(face) * 9;
+    for (let i = 0; i < 9; i++) facelets[start + i] = blocks[face][i];
+  }
+  return facelets.join('');
+}
+
+/**
+ * Resolves an ambiguous scan once a 6th photo (the D/bottom face, any
+ * rotation) is supplied. All 54 stickers are then known modulo 2 unresolved
+ * photo rotations (U and D); tries all 16 combinations directly — no
+ * backtracking needed, since every sticker is already known — and
+ * validates.
+ */
+export function resolveAmbiguousScan(sides: KnownSides, dPhoto: FaceGrid): AssembleResult {
+  const valid = new Set<string>();
+  for (let uRot = 0; uRot < 4; uRot++) {
+    for (let dRot = 0; dRot < 4; dRot++) {
+      const candidate = buildFacelets({
+        U: rotateGrid(sides.U, uRot),
+        R: sides.R,
+        F: sides.F,
+        L: sides.L,
+        B: sides.B,
+        D: rotateGrid(dPhoto, dRot),
+      });
+      if (validateScan(candidate).valid) valid.add(candidate);
     }
   }
-  return { ok: false, reason: 'no-valid-candidate' };
+  const result = [...valid];
+  if (result.length === 1) return { ok: true, facelets: result[0] };
+  if (result.length === 0) return { ok: false, reason: 'no-valid-candidate' };
+  return { ok: false, reason: 'ambiguous' };
 }
 ```
 
 - [ ] **Step 4: Run and confirm it passes**
 
 Run: `npm test -- scanAssembly`
-Expected: PASS, 2 tests. Then run the full suite: `npm test` — every test
-in the project (dragResolver + this task's new files) should be green.
+Expected: PASS, 7 tests (1 `test.each`-expanded ×4 + 3 others). Then run
+the full suite: `npm test` — every test in the project should be green.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/cube/scanAssembly.ts src/cube/scanAssembly.test.ts
-git commit -m "Add scan assembly: generate candidates, validate, pick the real one"
+git commit -m "Add scan assembly: generate candidates, validate, detect ambiguity, resolve with a 6th photo"
 ```
+
+**Downstream note (for Tasks 9, 11, 13):** the scan wizard's state machine
+must now handle a third outcome after the 5-photo flow, not just
+success/failure: `ambiguous` triggers a request for one more photo (the D
+face), which then goes through `resolveAmbiguousScan`. This wasn't in the
+original design and will need its own UI step — flag it explicitly when
+those tasks are dispatched rather than assuming the original two-outcome
+design still holds.
 
 ---
 
