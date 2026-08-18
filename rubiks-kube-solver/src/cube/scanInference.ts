@@ -96,8 +96,8 @@ export function generateScanCandidates(sides: KnownSides): string[] {
     }
 
     const usedCenters = new Set((['U', 'R', 'F', 'L', 'B'] as const).map((f) => known[f][4]));
-    const dCenter = (['U', 'D', 'F', 'B', 'L', 'R'] as FaceLetter[]).find((l) => !usedCenters.has(l));
-    if (!dCenter) continue; // U/F/R/L/B centers weren't all distinct - this rotation can't be valid
+    if (usedCenters.size !== 5) continue; // known centers weren't all distinct - this rotation can't be valid
+    const dCenter = (['U', 'D', 'F', 'B', 'L', 'R'] as FaceLetter[]).find((l) => !usedCenters.has(l))!;
     facelets[FACE_ORDER.indexOf('D') * 9 + 4] = dCenter;
 
     const nonDCorners = CORNER_POSITIONS.filter((p) => p.y === 1);

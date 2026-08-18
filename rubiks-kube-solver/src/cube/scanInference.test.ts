@@ -16,9 +16,13 @@ describe('rotateGrid', () => {
     expect(rotateGrid(grid, 1).join('')).toBe('630741852');
   });
 
-  test('four rotations return to the original', () => {
+  test('four single rotations compose back to the original', () => {
     const grid = 'URFDLBURF'.split('') as FaceGrid;
-    expect(rotateGrid(grid, 4)).toEqual(grid);
+    let result = grid;
+    for (let i = 0; i < 4; i++) {
+      result = rotateGrid(result, 1);
+    }
+    expect(result).toEqual(grid);
   });
 
   test('negative and large rotation counts wrap correctly', () => {
@@ -59,6 +63,24 @@ describe('generateScanCandidates', () => {
     });
 
     expect(candidates).toContain(facelets);
+  });
+
+  test('returns no candidates when known face centers are not all distinct', () => {
+    const cube = new Cube();
+    const facelets = cube.asString();
+    const F = blockOf(facelets, 'F');
+    const R = blockOf(facelets, 'R');
+    R[4] = F[4]; // duplicate center: R and F now report the same color, for every U rotation
+
+    const candidates = generateScanCandidates({
+      F,
+      R,
+      B: blockOf(facelets, 'B'),
+      L: blockOf(facelets, 'L'),
+      U: blockOf(facelets, 'U'),
+    });
+
+    expect(candidates).toEqual([]);
   });
 
   test('every candidate has all 6 centers distinct', () => {
