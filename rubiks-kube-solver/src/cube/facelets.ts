@@ -59,6 +59,27 @@ for (const x of [-1, 0, 1] as const) {
   }
 }
 
+export function getFaceletIndex(pos: CubiePosition, face: FaceLetter): number | undefined {
+  return STICKER_INDEX.get(`${pos.x},${pos.y},${pos.z},${face}`);
+}
+
+/** Which face letters a cubie at `pos` touches (2 for an edge, 3 for a corner). */
+export function facesTouchedBy(pos: CubiePosition): FaceLetter[] {
+  const faces: FaceLetter[] = [];
+  if (pos.x !== 0) faces.push(pos.x > 0 ? 'R' : 'L');
+  if (pos.y !== 0) faces.push(pos.y > 0 ? 'U' : 'D');
+  if (pos.z !== 0) faces.push(pos.z > 0 ? 'F' : 'B');
+  return faces;
+}
+
+export const CORNER_POSITIONS: CubiePosition[] = CUBIE_POSITIONS.filter(
+  (p) => p.x !== 0 && p.y !== 0 && p.z !== 0
+);
+
+export const EDGE_POSITIONS: CubiePosition[] = CUBIE_POSITIONS.filter(
+  (p) => [p.x, p.y, p.z].filter((c) => c !== 0).length === 2
+);
+
 /** For a cubie at (x,y,z), returns the sticker color for each of the 6 box faces (or the interior color). */
 export function getCubieFaceColors(
   pos: CubiePosition,
