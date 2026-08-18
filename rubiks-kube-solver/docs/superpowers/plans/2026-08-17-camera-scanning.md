@@ -2102,8 +2102,42 @@ still work. Write a throwaway Playwright script that:
    then `Løs` still work afterward (reuse the exact polling pattern from
    the earlier drag-feature Playwright scripts in this conversation).
 
-Fix anything this surfaces (most likely candidate: the `ScanGridOverlay`
-coordinate-scaling note flagged in Task 11) before moving on.
+Fix anything this surfaces. The most likely candidate is the
+`ScanGridOverlay` coordinate-scaling note flagged in Task 11 — Task 11's
+own review already diagnosed the precise mechanism, not just guessed at
+it: `ScanGridOverlay`'s `<svg className="scan-grid-overlay">` (Task 10) has
+no `viewBox`, so its `<rect>`/`<line>` children (drawn in image-pixel
+coordinates, e.g. up to ~3000+) render in the SVG's own default user-unit
+space rather than being remapped to match the canvas's CSS display size
+(`max-width/max-height: 100%`). The fix is to give the `<svg>` a
+`viewBox={`0 0 ${canvas.width} ${canvas.height}`}` (the canvas's own pixel
+dimensions, available from `canvasRef.current` in `ScanWizard.tsx`, passed
+down as a new prop or read via the existing `bounds`-sized wrapping div) so
+the SVG scales identically to the canvas beneath it. Verify visually
+(screenshot) that the grid overlay's cells actually align with the
+synthetic photo's 3×3 swatches before considering this fixed — don't just
+confirm it typechecks or that pixel colors happen to sample correctly by
+coincidence at one grid size.
+
+- [ ] **Step 2b: Verify the `capturingD` fallback path** (added
+  2026-08-18, alongside the Task 6/9/11/13 corrections — this is the one
+  part of the whole feature with no test coverage yet, automated or
+  manual, since it was added mid-plan)
+
+  Using the known-ambiguous fixture facelet string captured during the
+  Task 6 investigation — `UDUFUBLUURLBFRDFLFDBFFFDDLLRUDRDFUUDBRBBLULDBLBRLBRRRF`
+  (confirmed to require a 6th photo to resolve) — repeat Step 2's synthetic-photo
+  generation for F/R/B/L/U from this fixture instead of `SOLVED_STATE`, run
+  through the same 5-step wizard flow, and confirm:
+  1. After the 5th "Bekreft", the wizard shows the `capturingD` step (the
+     "Ekstra bilde" header and D-photo instruction text from Task 11) —
+     not a blank screen.
+  2. Generate a 6th synthetic photo for the D face from the same fixture
+     (any rotation is fine — `resolveAmbiguousScan` tries all 4), submit
+     it the same way, click "Bekreft".
+  3. The review screen appears with a valid, usable result matching the
+     original fixture string, and "Bruk denne kuben" is enabled.
+  4. Click it; confirm the 3D view loads the expected state.
 
 - [ ] **Step 3: Update the README**
 
