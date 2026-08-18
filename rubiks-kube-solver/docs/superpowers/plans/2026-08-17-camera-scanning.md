@@ -2183,3 +2183,222 @@ git push -u origin claude/rubiks-kube-solver-mmt9s3
   Task 6's round-trip test provides a second, independent check (many
   random scrambles must survive the *entire* pipeline, not just
   validation in isolation).
+
+---
+
+## Post-final-review fix (2026-08-18)
+
+The final whole-branch review (after all 14 tasks above) found a Critical
+defect the per-task reviews structurally could not catch: `colorClassifier.ts`
+maps real-world hue directly to fixed canonical letters (green→F, red→R,
+etc.), and `scanValidation.ts`'s canonical-center check (correctly hardened
+during Task 5's own review) then requires the F-photo's center to literally
+*be* green — meaning the scan only works if the user happens to start with
+a specific side facing the camera, directly contradicting this design's own
+promise (line 45-47 above: "hvilken fysisk farge som havner hvor er
+irrelevant"). Also found: `ScanReview.tsx` seeds the correction screen with
+an all-white cube on any failure (plan-mandated, from this document's own
+original Task 12 text), making manual correction unusable exactly when
+needed.
+
+**Fix (verified against real `cubejs` whole-cube-rotated states —
+`cube.move('y')` etc. — before being written here; a first, simpler-seeming
+per-sticker recoloring approach was tried and found to silently produce
+wrong-but-valid states for scrambled cubes, so it was discarded in favor of
+this one):**
+
+`src/cube/scanAssembly.ts` — since the 4 side photos are taken in a fixed
+cyclic sequence but which one the user started with is unconstrained, try
+all 4 cyclic reassignments of the captured F/R/B/L blocks (whole blocks,
+verbatim, no per-sticker recoloring) in both `assembleScan` and
+`resolveAmbiguousScan`, combined with the existing U-rotation (and, for the
+latter, D-rotation) search:
+
+```ts
+// src/cube/scanAssembly.ts
+import { generateScanCandidates, rotateGrid, type KnownSides } from './scanInference';
+import { validateScan } from './scanValidation';
+import { FACE_ORDER } from './facelets';
+import type { FaceLetter } from './moveEngine';
+import type { FaceGrid } from './scanTypes';
+
+export type AssembleResult =
+  | { ok: true; facelets: string }
+  | { ok: false; reason: 'no-valid-candidate' | 'ambiguous' };
+
+/**
+ * The 4 side photos are taken in a fixed cyclic sequence (each one 90
+ * degrees further around the vertical axis than the last, per the table-top
+ * turning protocol), but which physical side the user started with is
+ * unconstrained - so all 4 cyclic relabelings of the same 4 photos are
+ * equally valid hypotheses for which one is really F.
+ */
+function cyclicReassignments(sides: KnownSides): KnownSides[] {
+  const captured = [sides.F, sides.R, sides.B, sides.L];
+  const reassignments: KnownSides[] = [];
+  for (let offset = 0; offset < 4; offset++) {
+    reassignments.push({
+      F: captured[offset % 4],
+      R: captured[(offset + 1) % 4],
+      B: captured[(offset + 2) % 4],
+      L: captured[(offset + 3) % 4],
+      U: sides.U,
+    });
+  }
+  return reassignments;
+}
+
+/**
+ * Assembles a full 54-char facelet string from 5 known side photos (F/R/B/L
+ * fully known up to which one is really F, U known up to an unresolved
+ * rotation). Multiple different real cube states can share the same 5
+ * photos (~1 in 4 scrambled cubes, by measurement) — reported as
+ * 'ambiguous' rather than silently guessed, so the caller can fall back to
+ * `resolveAmbiguousScan` with a 6th (D) photo.
+ */
+export function assembleScan(sides: KnownSides): AssembleResult {
+  const candidates = cyclicReassignments(sides).flatMap((reassigned) => generateScanCandidates(reassigned));
+  const valid = [...new Set(candidates.filter((c) => validateScan(c).valid))];
+  if (valid.length === 1) return { ok: true, facelets: valid[0] };
+  if (valid.length === 0) return { ok: false, reason: 'no-valid-candidate' };
+  return { ok: false, reason: 'ambiguous' };
+}
+
+function buildFacelets(blocks: Record<FaceLetter, FaceGrid>): string {
+  const facelets: FaceLetter[] = new Array(54);
+  for (const face of FACE_ORDER) {
+    const start = FACE_ORDER.indexOf(face) * 9;
+    for (let i = 0; i < 9; i++) facelets[start + i] = blocks[face][i];
+  }
+  return facelets.join('');
+}
+
+/**
+ * Resolves an ambiguous scan once a 6th photo (the D/bottom face, any
+ * rotation) is supplied. All 54 stickers are then known modulo 3 unresolved
+ * degrees of freedom (which side is really F, U's rotation, D's rotation);
+ * tries all 4 x 4 x 4 = 64 combinations directly — no backtracking needed,
+ * since every sticker is already known — and validates.
+ */
+export function resolveAmbiguousScan(sides: KnownSides, dPhoto: FaceGrid): AssembleResult {
+  const valid = new Set<string>();
+  for (const reassigned of cyclicReassignments(sides)) {
+    for (let uRot = 0; uRot < 4; uRot++) {
+      for (let dRot = 0; dRot < 4; dRot++) {
+        const candidate = buildFacelets({
+          U: rotateGrid(reassigned.U, uRot),
+          R: reassigned.R,
+          F: reassigned.F,
+          L: reassigned.L,
+          B: reassigned.B,
+          D: rotateGrid(dPhoto, dRot),
+        });
+        if (validateScan(candidate).valid) valid.add(candidate);
+      }
+    }
+  }
+  const result = [...valid];
+  if (result.length === 1) return { ok: true, facelets: result[0] };
+  if (result.length === 0) return { ok: false, reason: 'no-valid-candidate' };
+  return { ok: false, reason: 'ambiguous' };
+}
+```
+
+This only handles the F/R/B/L rotation ambiguity the physical protocol
+allows (spinning around the vertical axis between the 4 side photos) — it
+does not attempt to handle an arbitrary top-face color, which the spec
+never promised was irrelevant. `src/components/ScanWizard.tsx`'s first step
+instruction is changed to close that narrower remaining gap explicitly:
+
+```diff
+ const STEP_TEXT = [
+-  'Ta bilde av siden som ser på deg.',
++  'Legg kuben på bordet med hvit side opp. Ta bilde av siden som ser på deg.',
+   'Snu en gang til høyre. Ta bilde.',
+```
+
+`src/hooks/useCubeScan.ts` — expose a best-effort facelets string built
+from whatever was actually captured (raw capture order, D filled with the
+one leftover canonical letter by the same elimination logic used
+elsewhere, or 'U' if even that can't be determined), for seeding the
+review screen on failure instead of a blank cube:
+
+```ts
+import { FACE_ORDER } from '../cube/facelets';
+// ...existing imports unchanged...
+
+/** A best-effort 54-char facelets string from whatever was actually
+ * photographed, for seeding the review/correction screen when assembly
+ * failed - the captured colors themselves, in raw capture order, plus D
+ * filled with the one leftover color (or 'U' if even that can't be
+ * determined) rather than an uninformative all-white cube. */
+function buildBestEffort(captured: Partial<Record<CaptureFace, FaceGrid>>): string | null {
+  if (!captured.F || !captured.R || !captured.B || !captured.L || !captured.U) return null;
+  const knownCenters = [captured.U[4], captured.R[4], captured.F[4], captured.L[4], captured.B[4]];
+  const distinct = new Set(knownCenters);
+  const dLetter =
+    distinct.size === 5 ? (['U', 'D', 'F', 'B', 'L', 'R'] as FaceLetter[]).find((l) => !distinct.has(l)) : undefined;
+  const blocks: Record<FaceLetter, FaceGrid> = {
+    U: captured.U,
+    R: captured.R,
+    F: captured.F,
+    D: new Array(9).fill(dLetter ?? 'U') as FaceGrid,
+    L: captured.L,
+    B: captured.B,
+  };
+  const facelets: FaceLetter[] = new Array(54);
+  for (const face of FACE_ORDER) {
+    const start = FACE_ORDER.indexOf(face) * 9;
+    for (let i = 0; i < 9; i++) facelets[start + i] = blocks[face][i];
+  }
+  return facelets.join('');
+}
+```
+
+Add `capturedFacelets: buildBestEffort(captured),` to `useCubeScan`'s
+returned object (alongside the existing fields).
+
+`src/components/ScanReview.tsx` — accept a new `capturedFacelets: string |
+null` prop, and seed from it instead of a blank cube when `result` failed:
+
+```diff
+ interface Props {
+   result: AssembleResult;
++  capturedFacelets: string | null;
+   onUse: (facelets: string) => void;
+   onCancel: () => void;
+ }
+
+-export function ScanReview({ result, onUse, onCancel }: Props) {
+-  const [facelets, setFacelets] = useState(() =>
+-    result.ok ? result.facelets : 'U'.repeat(54)
+-  );
++export function ScanReview({ result, capturedFacelets, onUse, onCancel }: Props) {
++  const [facelets, setFacelets] = useState(
++    () => (result.ok ? result.facelets : capturedFacelets) ?? 'U'.repeat(54)
++  );
+```
+
+`src/App.tsx` — pass the new prop through:
+
+```diff
+-      {scan.phase.kind === 'review' && (
+-        <ScanReview result={scan.phase.result} onUse={handleUseScan} onCancel={scan.cancel} />
+-      )}
++      {scan.phase.kind === 'review' && (
++        <ScanReview
++          result={scan.phase.result}
++          capturedFacelets={scan.capturedFacelets}
++          onUse={handleUseScan}
++          onCancel={scan.cancel}
++        />
++      )}
+```
+
+**Deferred (not fixed in this round, per the "one fix dispatch" cap on
+final-review findings — see the ledger for the full list and reasoning):**
+no way to retake a single wizard step without restarting; `ScanGridOverlay`'s
+drag math doesn't correct for canvas display-vs-intrinsic scale; the
+UI/state-machine layer has no committed automated test coverage; no
+`img.onerror` handling on file-picker photo loads; several Minor
+documentation/typing/style items.
