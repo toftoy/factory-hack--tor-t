@@ -165,3 +165,11 @@ input[type='range'] {
   word-break: break-word;
   color: var(--text);
 }
+
+.scan-grid-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
