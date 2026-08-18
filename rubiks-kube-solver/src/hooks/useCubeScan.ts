@@ -39,8 +39,7 @@ export type ScanPhase =
   | { kind: 'idle' }
   | { kind: 'capturing'; stepIndex: number; image: HTMLImageElement | null }
   | { kind: 'capturingD'; image: HTMLImageElement | null }
-  | { kind: 'review'; result: AssembleResult }
-  | { kind: 'done' };
+  | { kind: 'review'; result: AssembleResult };
 
 export function useCubeScan() {
   const [phase, setPhase] = useState<ScanPhase>({ kind: 'idle' });
@@ -120,7 +119,7 @@ export function useCubeScan() {
   );
 
   const finish = useCallback(() => {
-    setPhase({ kind: 'done' });
+    setPhase({ kind: 'idle' });
   }, []);
 
   return {
