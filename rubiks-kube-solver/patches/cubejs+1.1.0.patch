@@ -1,0 +1,13 @@
+diff --git a/node_modules/cubejs/lib/solve.js b/node_modules/cubejs/lib/solve.js
+index ba71ef3..aee305d 100644
+--- a/node_modules/cubejs/lib/solve.js
++++ b/node_modules/cubejs/lib/solve.js
+@@ -3,7 +3,7 @@
+     slice1 = [].slice,
+     indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
+ 
+-  Cube = this.Cube || require('./cube');
++  Cube = require('./cube');
+ 
+   ref = [0, 1, 2, 3, 4, 5], U = ref[0], R = ref[1], F = ref[2], D = ref[3], L = ref[4], B = ref[5];
+ 

@@ -1,0 +1,181 @@
+export type TrainingTrack = 'beginner' | 'oll-pll-2look';
+
+export interface AlgorithmCase {
+  id: string;
+  track: TrainingTrack;
+  name: string;
+  setupMoves: string;
+  solutionMoves: string;
+  description: string;
+}
+
+export const BEGINNER_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'beginner-f2l-left',
+    track: 'beginner',
+    name: 'F2L-kant venstre',
+    setupMoves: "F U F' U' L' U' L U",
+    solutionMoves: "U' L' U L U F U' F'",
+    description: 'Sett inn en kant-brikke fra toppen ned i mellomlaget, til venstre.',
+  },
+  {
+    id: 'beginner-f2l-right',
+    track: 'beginner',
+    name: 'F2L-kant høyre',
+    setupMoves: "F' U' F U R U R' U'",
+    solutionMoves: "U R U' R' U' F' U F",
+    description: 'Sett inn en kant-brikke fra toppen ned i mellomlaget, til høyre.',
+  },
+  {
+    id: 'beginner-yellow-cross',
+    track: 'beginner',
+    name: 'Gult kors',
+    setupMoves: "F U R U' R' F'",
+    solutionMoves: "F R U R' U' F'",
+    description: 'Orienter kantene i toppsjiktet slik at gult kors dannes.',
+  },
+  {
+    id: 'beginner-sune',
+    track: 'beginner',
+    name: 'Sune',
+    setupMoves: "R U2 R' U' R U' R'",
+    solutionMoves: "R U R' U R U2 R'",
+    description: 'Orienter de tre siste hjørnene i toppsjiktet (ett er allerede riktig).',
+  },
+  {
+    id: 'beginner-corner-perm',
+    track: 'beginner',
+    name: 'Hjørne-permutasjon',
+    setupMoves: "R2 F2 R' B' R F2 R' B R'",
+    solutionMoves: "R B' R F2 R' B R F2 R2",
+    description: 'Bytt om tre hjørner i toppsjiktet slik at alle havner på riktig plass.',
+  },
+  {
+    id: 'beginner-edge-perm',
+    track: 'beginner',
+    name: 'Kant-permutasjon',
+    setupMoves: "R U' R U R U R U' R' U' R2",
+    solutionMoves: "R2 U R U R' U' R' U' R' U R'",
+    description: 'Bytt om tre kanter i toppsjiktet slik at alle havner på riktig plass.',
+  },
+];
+
+export const OLL_PLL_2LOOK_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'oll-sune',
+    track: 'oll-pll-2look',
+    name: 'Sune (OLL)',
+    setupMoves: "R U2 R' U' R U' R'",
+    solutionMoves: "R U R' U R U2 R'",
+    description: 'Orienter de tre siste hjørnene i toppsjiktet.',
+  },
+  {
+    id: 'oll-antisune',
+    track: 'oll-pll-2look',
+    name: 'Anti-Sune (OLL)',
+    setupMoves: "R U R' U R U2 R'",
+    solutionMoves: "R U2 R' U' R U' R'",
+    description: 'Speilvendt Sune - orienter de tre siste hjørnene motsatt vei.',
+  },
+  {
+    id: 'oll-sune-mirror',
+    track: 'oll-pll-2look',
+    name: 'Sune speilvendt (OLL)',
+    setupMoves: "L' U2 L U L' U L",
+    solutionMoves: "L' U' L U' L' U2 L",
+    description: 'Sune utført på venstre side - orienter de tre siste hjørnene.',
+  },
+  {
+    id: 'oll-antisune-mirror',
+    track: 'oll-pll-2look',
+    name: 'Anti-Sune speilvendt (OLL)',
+    setupMoves: "L' U' L U' L' U2 L",
+    solutionMoves: "L' U2 L U L' U L",
+    description: 'Anti-Sune utført på venstre side - orienter de tre siste hjørnene motsatt vei.',
+  },
+  {
+    id: 'oll-pi',
+    track: 'oll-pll-2look',
+    name: 'Pi (OLL)',
+    setupMoves: "R' U2 R2 U R2 U R2 U2 R'",
+    solutionMoves: "R U2 R2 U' R2 U' R2 U2 R",
+    description: 'Orienter alle fire hjørnene i toppsjiktet - ingen er riktig fra start.',
+  },
+  {
+    id: 'oll-h',
+    track: 'oll-pll-2look',
+    name: 'H (OLL)',
+    setupMoves: "R U2 R' U' R U R' U' R U' R'",
+    solutionMoves: "R U R' U R U' R' U R U2 R'",
+    description: 'Orienter fire hjørner i toppsjiktet i et H-mønster.',
+  },
+  {
+    id: 'oll-u',
+    track: 'oll-pll-2look',
+    name: 'U (OLL)',
+    setupMoves: "R U2 R D R' U2 R D' R2",
+    solutionMoves: "R2 D R' U2 R D' R' U2 R'",
+    description: 'Orienter fire hjørner i toppsjiktet i et U-mønster.',
+  },
+  {
+    id: 'oll-edge-line',
+    track: 'oll-pll-2look',
+    name: 'Linje (OLL kant)',
+    setupMoves: "F U R U' R' F'",
+    solutionMoves: "F R U R' U' F'",
+    description: 'Orienter kantene i toppsjiktet - to motstående kanter mangler.',
+  },
+  {
+    id: 'oll-edge-l-shape',
+    track: 'oll-pll-2look',
+    name: 'L-form (OLL kant)',
+    setupMoves: "F R U R' U' F'",
+    solutionMoves: "F U R U' R' F'",
+    description: 'Orienter kantene i toppsjiktet - to nabokanter mangler.',
+  },
+  {
+    id: 'pll-ua-perm',
+    track: 'oll-pll-2look',
+    name: 'Ua-perm (PLL)',
+    setupMoves: "R2 U R U R' U' R' U' R' U R'",
+    solutionMoves: "R U' R U R U R U' R' U' R2",
+    description: 'Sykle tre kanter i toppsjiktet mot klokken.',
+  },
+  {
+    id: 'pll-ub-perm',
+    track: 'oll-pll-2look',
+    name: 'Ub-perm (PLL)',
+    setupMoves: "R U' R U R U R U' R' U' R2",
+    solutionMoves: "R2 U R U R' U' R' U' R' U R'",
+    description: 'Sykle tre kanter i toppsjiktet med klokken.',
+  },
+  {
+    id: 'pll-h-perm',
+    track: 'oll-pll-2look',
+    name: 'H-perm (PLL)',
+    setupMoves: "R2 U2 R' U2 R2 U2 R2 U2 R' U2 R2",
+    solutionMoves: "R2 U2 R U2 R2 U2 R2 U2 R U2 R2",
+    description: 'Bytt om to par motstående kanter i toppsjiktet.',
+  },
+  {
+    id: 'pll-aa-perm',
+    track: 'oll-pll-2look',
+    name: 'Aa-perm (PLL)',
+    setupMoves: "R2 B2 R F R' B2 R F' R",
+    solutionMoves: "R' F R' B2 R F' R' B2 R2",
+    description: 'Sykle tre hjørner i toppsjiktet mot klokken.',
+  },
+  {
+    id: 'pll-ab-perm',
+    track: 'oll-pll-2look',
+    name: 'Ab-perm (PLL)',
+    setupMoves: "R2 F2 R' B' R F2 R' B R'",
+    solutionMoves: "R B' R F2 R' B R F2 R2",
+    description: 'Sykle tre hjørner i toppsjiktet med klokken.',
+  },
+];
+
+export const TRACKS: Record<TrainingTrack, AlgorithmCase[]> = {
+  beginner: BEGINNER_ALGORITHMS,
+  'oll-pll-2look': OLL_PLL_2LOOK_ALGORITHMS,
+};
