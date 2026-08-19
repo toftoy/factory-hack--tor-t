@@ -30,6 +30,19 @@ two-phase-algoritme, med animerte trekk i 3D.
   (f.eks. U, U', U2) — og må fullføres én gang før nybegynner- eller
   2-look-sporet blir tilgjengelig. Det forblir tilgjengelig for gjenbesøk
   etterpå, med en egen nullstill-knapp for å starte et spor helt på nytt.
+- **Lær å løse kuben** ("🧩 Lær å løse kuben"): den nye primærknappen og
+  appens standard inngangspunkt — en styrt reise gjennom hele
+  nybegynnermetoden i 7 steg (kors, hjørner, mellomlag, gult kors, vend
+  hjørner, plasser hjørner, plasser kanter), bygget oppå samme
+  case-for-case-motor som algoritmetreningen over, men med ett-gangs
+  fremgang per case i stedet for et 3-på-rad-krav. Krever, akkurat som de
+  andre sporene, at notasjonssporet er fullført først — trykker du på
+  knappen før det er gjort, starter den notasjonsleksjonen i stedet. Når
+  alle 7 stegene er unnagjort vises en egen feiringsskjerm ("Du løste
+  kuben fra bunnen av!"). Bland/løs/skann og de navngitte
+  algoritme-treningssporene er fortsatt tilgjengelige, nå samlet bak en
+  "▸ Verktøy for viderekomne"-seksjon i panelet for de som allerede
+  kjenner metoden.
 
 ## Kom i gang
 
@@ -84,6 +97,18 @@ npm run preview        # server produksjonsbygget lokalt
   algoritmetrening. `src/hooks/useAlgorithmTraining.ts` er
   tilstandsmaskinen; `src/components/TrainingWizard.tsx` er HUD-en som
   ligger over den eksisterende 3D-visningen uten å blokkere den.
+- `src/cube/guidedJourney.ts`, `src/hooks/useGuidedJourney.ts`,
+  `src/components/GuidedJourney.tsx` – den styrte løse-reisen: 7 steg satt
+  sammen av egne kors-/hjørne-case (`CROSS_ALGORITHMS`/`CORNER_ALGORITHMS`)
+  pluss et utvalg fra `algorithms.ts` sine eksisterende nybegynner-case.
+  `useGuidedJourney` speiler `useAlgorithmTraining.ts` sitt
+  ready/timing/solved/demonstrating-tilstandsmønster (samme
+  `SOLVED_PAUSE_MS`-pause før neste case settes opp), men med ett-gangs
+  fremgang lagret under en egen `localStorage`-nøkkel i stedet for
+  streak-basert mestring per spor. `GuidedJourney.tsx` er HUD-en, inkludert
+  den avsluttende feiringsskjermen. Se
+  `docs/superpowers/specs/2026-08-19-guided-solve-journey-design.md` for
+  fullt design.
 
 Kubens logiske tilstand holdes alltid som en 54-tegns facelet-streng. Under en
 trekk-animasjon (automatisk eller manuell) rendres kun det aktive laget i en
