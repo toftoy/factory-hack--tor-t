@@ -2,7 +2,14 @@ import { describe, expect, test } from 'vitest';
 import Cube from 'cubejs';
 import { parseAlgorithm } from './moveEngine';
 import { SOLVED_STATE } from './facelets';
-import { BEGINNER_ALGORITHMS, NOTATION_ALGORITHMS, OLL_PLL_2LOOK_ALGORITHMS, TRACKS } from './algorithms';
+import {
+  BEGINNER_ALGORITHMS,
+  CORNER_ALGORITHMS,
+  CROSS_ALGORITHMS,
+  NOTATION_ALGORITHMS,
+  OLL_PLL_2LOOK_ALGORITHMS,
+  TRACKS,
+} from './algorithms';
 
 function applyAlgorithm(cube: InstanceType<typeof Cube>, notation: string): void {
   for (const move of parseAlgorithm(notation)) {
@@ -11,7 +18,13 @@ function applyAlgorithm(cube: InstanceType<typeof Cube>, notation: string): void
 }
 
 describe('algorithm data', () => {
-  const allCases = [...NOTATION_ALGORITHMS, ...BEGINNER_ALGORITHMS, ...OLL_PLL_2LOOK_ALGORITHMS];
+  const allCases = [
+    ...NOTATION_ALGORITHMS,
+    ...BEGINNER_ALGORITHMS,
+    ...OLL_PLL_2LOOK_ALGORITHMS,
+    ...CROSS_ALGORITHMS,
+    ...CORNER_ALGORITHMS,
+  ];
 
   test('every case has a unique id', () => {
     const ids = allCases.map((c) => c.id);
@@ -41,5 +54,9 @@ describe('algorithm data', () => {
     expect(TRACKS.notation).toBe(NOTATION_ALGORITHMS);
     expect(TRACKS.beginner).toBe(BEGINNER_ALGORITHMS);
     expect(TRACKS['oll-pll-2look']).toBe(OLL_PLL_2LOOK_ALGORITHMS);
+  });
+
+  test('TRACKS exposes guided-basics with cross + corner cases', () => {
+    expect(TRACKS['guided-basics']).toEqual([...CROSS_ALGORITHMS, ...CORNER_ALGORITHMS]);
   });
 });

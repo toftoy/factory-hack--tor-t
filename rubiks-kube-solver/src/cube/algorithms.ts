@@ -1,4 +1,4 @@
-export type TrainingTrack = 'notation' | 'beginner' | 'oll-pll-2look';
+export type TrainingTrack = 'notation' | 'beginner' | 'oll-pll-2look' | 'guided-basics';
 
 export interface AlgorithmCase {
   id: string;
@@ -92,6 +92,45 @@ export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
     solutionMoves: 'B',
     description:
       '🔄 Baksiden er gjemt! Dra utenfor kuben for å dreie kameraet helt rundt til du ser den, snu den så B med klokken. Sitter du fast, trykk 🧭 for å komme tilbake. Nå har du lært alle seks sidene!',
+  },
+];
+
+export const CROSS_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'cross-flip-in-place',
+    track: 'guided-basics',
+    name: 'Kors: vend kanten',
+    setupMoves: 'F2',
+    solutionMoves: 'F2',
+    description:
+      'Kant-brikken er rett over plassen sin, men vender feil vei - ett trekk vender den riktig og setter den på plass.',
+  },
+  {
+    id: 'cross-free-then-place',
+    track: 'guided-basics',
+    name: 'Kors: løsne og sett på plass',
+    setupMoves: "R F'",
+    solutionMoves: "F R'",
+    description: 'Kant-brikken sitter fast et annet sted. Løsne den først, så setter den seg rett på plass.',
+  },
+];
+
+export const CORNER_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'corner-pocket',
+    track: 'guided-basics',
+    name: 'Hjørne: lomme-trikset',
+    setupMoves: "R U R'",
+    solutionMoves: "R U' R'",
+    description: 'Løft hjørnet ut av lomma, vend det riktig vei, og sett laget tilbake.',
+  },
+  {
+    id: 'corner-from-the-side',
+    track: 'guided-basics',
+    name: 'Hjørne: fra siden',
+    setupMoves: "F' D F",
+    solutionMoves: "F' D' F",
+    description: 'Hjørnet sitter fast på siden. Dette trikset drar det ut og setter det ned riktig vei.',
   },
 ];
 
@@ -265,4 +304,5 @@ export const TRACKS: Record<TrainingTrack, AlgorithmCase[]> = {
   notation: NOTATION_ALGORITHMS,
   beginner: BEGINNER_ALGORITHMS,
   'oll-pll-2look': OLL_PLL_2LOOK_ALGORITHMS,
+  'guided-basics': [...CROSS_ALGORITHMS, ...CORNER_ALGORITHMS],
 };
