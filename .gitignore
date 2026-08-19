@@ -262,3 +262,6 @@ obj/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+
+# Superpowers skill workspace (visual companion sessions, SDD workspaces) - scratch only
+.superpowers/
