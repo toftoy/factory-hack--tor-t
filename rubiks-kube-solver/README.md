@@ -32,7 +32,7 @@ two-phase-algoritme, med animerte trekk i 3D.
   etterpå, med en egen nullstill-knapp for å starte et spor helt på nytt.
 - **Lær å løse kuben** ("🧩 Lær å løse kuben"): den nye primærknappen og
   appens standard inngangspunkt — en styrt reise gjennom hele
-  nybegynnermetoden i 7 steg (kors, hjørner, mellomlag, gult kors, vend
+  nybegynnermetoden i 7 steg (kors, hjørner, mellomlag, kors på toppen, vend
   hjørner, plasser hjørner, plasser kanter), bygget oppå samme
   case-for-case-motor som algoritmetreningen over, men med ett-gangs
   fremgang per case i stedet for et 3-på-rad-krav. Krever, akkurat som de

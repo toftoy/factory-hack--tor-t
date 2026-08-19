@@ -22,7 +22,7 @@ export const GUIDED_STAGES: GuidedStage[] = [
     icon: '🧩',
     cases: [beginnerCase('beginner-f2l-left'), beginnerCase('beginner-f2l-right')],
   },
-  { id: 'yellow-cross', title: 'Gult kors', icon: '✝️', cases: [beginnerCase('beginner-yellow-cross')] },
+  { id: 'yellow-cross', title: 'Kors på toppen', icon: '✝️', cases: [beginnerCase('beginner-yellow-cross')] },
   { id: 'orient-corners', title: 'Vend hjørner', icon: '🔄', cases: [beginnerCase('beginner-sune')] },
   { id: 'place-corners', title: 'Plasser hjørner', icon: '📍', cases: [beginnerCase('beginner-corner-perm')] },
   { id: 'place-edges', title: 'Plasser kanter', icon: '🏁', cases: [beginnerCase('beginner-edge-perm')] },

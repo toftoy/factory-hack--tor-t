@@ -72,6 +72,10 @@ export function GuidedJourney({ journey, onExit, onResetCamera }: Props) {
           <div className="training-complete-emoji">🏆</div>
           <div className="training-complete-title">Du løste kuben fra bunnen av!</div>
           <div className="training-complete-subtitle">Alle {GUIDED_STAGES.length} stegene er unnagjort. Kjempebra jobbet!</div>
+          <div className="training-complete-subtitle">
+            Nå kan du metoden! Prøv den på din egen kube - eller bruk Skann og Løs (under «For viderekomne») hvis du
+            trenger hjelp med en ekte blanding.
+          </div>
           <div className="training-complete-actions">
             <button onClick={resetJourney} className="training-skip-btn">
               🔄 Løs en ny kube

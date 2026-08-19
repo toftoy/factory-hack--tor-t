@@ -357,6 +357,9 @@ input[type='range'] {
   gap: 4px;
   flex: none;
   font-size: 0.9rem;
+}
+
+.journey-stage-icon {
   filter: grayscale(1) opacity(0.4);
 }
 

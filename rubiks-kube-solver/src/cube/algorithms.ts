@@ -103,7 +103,7 @@ export const CROSS_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: 'F2',
     solutionMoves: 'F2',
     description:
-      'Kant-brikken er rett over plassen sin, men vender feil vei - ett trekk vender den riktig og setter den på plass.',
+      'Kuben ser blandet ut, men se etter en kant-brikke med de to fargene til korset ditt - denne gangen står den rett over plassen sin, bare snudd feil vei. Ett trekk vender den riktig og setter den på plass.',
   },
   {
     id: 'cross-free-then-place',
@@ -111,7 +111,8 @@ export const CROSS_ALGORITHMS: AlgorithmCase[] = [
     name: 'Kors: løsne og sett på plass',
     setupMoves: "R F'",
     solutionMoves: "F R'",
-    description: 'Kant-brikken sitter fast et annet sted. Løsne den først, så setter den seg rett på plass.',
+    description:
+      'Finn kant-brikken med de to fargene til korset ditt - den kan sitte fast et annet sted på kuben. Løsne den først, så setter den seg rett på plass.',
   },
 ];
 
@@ -122,7 +123,8 @@ export const CORNER_ALGORITHMS: AlgorithmCase[] = [
     name: 'Hjørne: lomme-trikset',
     setupMoves: "R U R'",
     solutionMoves: "R U' R'",
-    description: 'Løft hjørnet ut av lomma, vend det riktig vei, og sett laget tilbake.',
+    description:
+      'Finn hjørnet med fargen til korset ditt på det - løft det ut av lomma, vend det riktig vei, og sett laget tilbake.',
   },
   {
     id: 'corner-from-the-side',
@@ -130,7 +132,8 @@ export const CORNER_ALGORITHMS: AlgorithmCase[] = [
     name: 'Hjørne: fra siden',
     setupMoves: "F' D F",
     solutionMoves: "F' D' F",
-    description: 'Hjørnet sitter fast på siden. Dette trikset drar det ut og setter det ned riktig vei.',
+    description:
+      'Finn hjørnet med fargen til korset ditt på det - dette trikset drar det ut fra siden og setter det ned riktig vei.',
   },
 ];
 
