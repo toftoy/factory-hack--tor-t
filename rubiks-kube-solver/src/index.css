@@ -367,20 +367,32 @@ input[type='range'] {
   color: var(--text-muted);
 }
 
-.training-exit {
+.training-exit,
+.training-reset {
   pointer-events: auto;
   flex: none;
   width: 44px;
   min-height: 44px;
   padding: 0;
-  background: var(--train-coral);
   border-radius: 12px;
   font-weight: 700;
   font-size: 1.1rem;
 }
 
+.training-exit {
+  background: var(--train-coral);
+}
+
 .training-exit:hover:not(:disabled) {
   background: var(--train-coral-hover);
+}
+
+.training-reset {
+  background: var(--train-border);
+}
+
+.training-reset:hover:not(:disabled) {
+  background: #4d3a99;
 }
 
 /* Move-card and footer are grouped together and pushed to the bottom of the
@@ -560,9 +572,15 @@ input[type='range'] {
   margin-top: 6px;
 }
 
+.training-complete-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
 .training-complete-exit {
   pointer-events: auto;
   width: auto;
-  margin-top: 20px;
   padding: 0 24px;
 }

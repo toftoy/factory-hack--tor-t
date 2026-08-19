@@ -26,9 +26,10 @@ two-phase-algoritme, med animerte trekk i 3D.
   case, du løser det selv ved å dra i lag, og appen tar tid og styrer
   fremgang med et 3-på-rad-krav for å låse opp neste algoritme. Et eget
   notasjons-spor ("Tren: Notasjon") lærer bort hva bokstaver og symboler
-  betyr (f.eks. U, U', U2) med noen få enkle trekk, og må fullføres én gang
-  før nybegynner- eller 2-look-sporet blir tilgjengelig — det forblir
-  tilgjengelig for gjenbesøk etterpå.
+  betyr — ti case som dekker alle seks sidene og alle modifikatorene
+  (f.eks. U, U', U2) — og må fullføres én gang før nybegynner- eller
+  2-look-sporet blir tilgjengelig. Det forblir tilgjengelig for gjenbesøk
+  etterpå, med en egen nullstill-knapp for å starte et spor helt på nytt.
 
 ## Kom i gang
 

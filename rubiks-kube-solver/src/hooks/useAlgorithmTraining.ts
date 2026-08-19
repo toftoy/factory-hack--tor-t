@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AlgorithmCase, TrainingTrack } from '../cube/algorithms';
 import {
   currentCase,
+  emptyProgress,
   isTrackComplete,
   loadProgress,
   recordAttempt,
@@ -148,6 +149,17 @@ export function useAlgorithmTraining(controller: CubeController) {
     setUpCase(track, nextProgress);
   }, [track, progress, setUpCase]);
 
+  // Wipes this track's persisted progress and restarts it from the first
+  // case - e.g. so a second kid sharing the same browser can start fresh.
+  const resetTrack = useCallback(() => {
+    if (!track) return;
+    const fresh = emptyProgress();
+    saveProgress(track, fresh);
+    setProgress(fresh);
+    setLastResult(null);
+    setUpCase(track, fresh);
+  }, [track, setUpCase]);
+
   return {
     track,
     phase,
@@ -157,6 +169,7 @@ export function useAlgorithmTraining(controller: CubeController) {
     stop,
     giveUp,
     skip,
+    resetTrack,
   };
 }
 

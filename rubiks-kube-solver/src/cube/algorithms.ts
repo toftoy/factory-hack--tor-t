@@ -50,6 +50,46 @@ export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
     solutionMoves: "R'",
     description: "R' snur høyre side mot klokken - samme regel som for U.",
   },
+  {
+    id: 'notation-l',
+    track: 'notation',
+    name: 'L',
+    setupMoves: "L'",
+    solutionMoves: 'L',
+    description: 'L snur venstre side med klokken.',
+  },
+  {
+    id: 'notation-f',
+    track: 'notation',
+    name: 'F',
+    setupMoves: "F'",
+    solutionMoves: 'F',
+    description: 'F snur forsiden (den som er mot deg) med klokken.',
+  },
+  {
+    id: 'notation-f-prime',
+    track: 'notation',
+    name: "F'",
+    setupMoves: 'F',
+    solutionMoves: "F'",
+    description: "F' snur forsiden mot klokken - samme regel som for U og R.",
+  },
+  {
+    id: 'notation-d',
+    track: 'notation',
+    name: 'D',
+    setupMoves: "D'",
+    solutionMoves: 'D',
+    description: 'D snur bunnen med klokken (sett nedenfra, under kuben).',
+  },
+  {
+    id: 'notation-b',
+    track: 'notation',
+    name: 'B',
+    setupMoves: "B'",
+    solutionMoves: 'B',
+    description: 'B snur baksiden med klokken (sett bakfra kuben). Nå har du lært alle seks sidene!',
+  },
 ];
 
 export const BEGINNER_ALGORITHMS: AlgorithmCase[] = [

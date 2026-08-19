@@ -32,7 +32,13 @@ function Confetti() {
 }
 
 export function TrainingWizard({ training, onExit }: Props) {
-  const { phase, track, progress, lastResult, giveUp, skip } = training;
+  const { phase, track, progress, lastResult, giveUp, skip, resetTrack } = training;
+
+  const handleReset = () => {
+    if (window.confirm('Nullstille fremgangen for dette sporet? Du mister stjernene dine.')) {
+      resetTrack();
+    }
+  };
 
   // The celebration has its own fixed duration, independent of the phase
   // machine - the next case's setup animation can be near-instant (a
@@ -56,9 +62,14 @@ export function TrainingWizard({ training, onExit }: Props) {
           <div className="training-complete-emoji">🏆</div>
           <div className="training-complete-title">Sporet er fullført!</div>
           <div className="training-complete-subtitle">Du klarte alle {TRACKS[track].length} casene. Kjempebra jobbet!</div>
-          <button onClick={onExit} className="training-exit training-complete-exit">
-            ✕ Avslutt
-          </button>
+          <div className="training-complete-actions">
+            <button onClick={handleReset} className="training-skip-btn">
+              🔄 Prøv igjen
+            </button>
+            <button onClick={onExit} className="training-exit training-complete-exit">
+              ✕ Avslutt
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -90,6 +101,14 @@ export function TrainingWizard({ training, onExit }: Props) {
         <span className="training-case-name">
           {algCase.name} <span className="training-case-number">({caseNumber}/{caseCount})</span>
         </span>
+        <button
+          onClick={handleReset}
+          className="training-reset"
+          disabled={phase.kind === 'demonstrating'}
+          aria-label="Nullstill sporet"
+        >
+          ↺
+        </button>
         <button onClick={onExit} className="training-exit">
           ✕
         </button>
