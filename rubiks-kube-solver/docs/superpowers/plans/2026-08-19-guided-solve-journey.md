@@ -1062,6 +1062,8 @@ Write a scratch script (not committed — put it in the scratchpad directory) th
 
 Run it and inspect the output/screenshot. If any assertion fails, treat it as a real bug in Tasks 1-5, not a script issue — fix the app, re-verify, and only then proceed. Report honestly if a step in the script itself is flaky (matching this session's existing "evidence before assertions" practice) rather than claiming success without it.
 
+> **Correction (added during the final whole-branch review, 2026-08-19):** the "repeatedly clicks 💡 Vis meg through all 10 guided-journey cases" description above is factually wrong — `giveUp()` (the "Vis meg" handler) only demonstrates the solution and never advances journey progress, by design. The Task 6 implementation actually seeded `localStorage` directly with a completed/in-progress journey state instead of driving progress through repeated "Vis meg" clicks. Left as a note rather than rewritten, since this is a historical plan document.
+
 - [ ] **Step 3: Update `README.md`**
 
 In the "Funksjoner" section, add a bullet after the existing "Tren på algoritmer" bullet describing the guided journey (new primary entry point, 7 steg, notation-krav, "For viderekomne"-seksjonen), and in the "Arkitektur" section add a line for `src/cube/guidedJourney.ts`, `src/hooks/useGuidedJourney.ts`, `src/components/GuidedJourney.tsx`, following the existing bullet style and cross-referencing `docs/superpowers/specs/2026-08-19-guided-solve-journey-design.md`.
