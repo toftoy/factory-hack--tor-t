@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TRACKS } from '../cube/algorithms';
-import type { AlgorithmTraining } from '../hooks/useAlgorithmTraining';
-
-const CELEBRATION_MS = 1200;
+import { SOLVED_PAUSE_MS, type AlgorithmTraining } from '../hooks/useAlgorithmTraining';
 
 interface Props {
   training: AlgorithmTraining;
@@ -44,7 +42,7 @@ export function TrainingWizard({ training, onExit }: Props) {
   useEffect(() => {
     if (!lastResult) return;
     setCelebrating(true);
-    const timer = setTimeout(() => setCelebrating(false), CELEBRATION_MS);
+    const timer = setTimeout(() => setCelebrating(false), SOLVED_PAUSE_MS);
     return () => clearTimeout(timer);
   }, [lastResult]);
 
@@ -127,11 +125,15 @@ export function TrainingWizard({ training, onExit }: Props) {
             <button
               className="training-help-btn"
               onClick={giveUp}
-              disabled={phase.kind === 'setting-up' || phase.kind === 'demonstrating'}
+              disabled={phase.kind === 'setting-up' || phase.kind === 'solved' || phase.kind === 'demonstrating'}
             >
               💡 Vis meg
             </button>
-            <button className="training-skip-btn" onClick={skip} disabled={phase.kind === 'demonstrating'}>
+            <button
+              className="training-skip-btn"
+              onClick={skip}
+              disabled={phase.kind === 'solved' || phase.kind === 'demonstrating'}
+            >
               Hopp over
             </button>
           </div>

@@ -17,8 +17,15 @@ export type TrainingPhase =
   | { kind: 'setting-up'; algCase: AlgorithmCase }
   | { kind: 'ready'; algCase: AlgorithmCase }
   | { kind: 'timing'; algCase: AlgorithmCase; startedAt: number }
+  | { kind: 'solved'; algCase: AlgorithmCase }
   | { kind: 'demonstrating'; algCase: AlgorithmCase }
   | { kind: 'track-complete' };
+
+// How long the cube sits solved (celebration showing) before the next case's
+// setup animation starts - without this, the reset+setup for the next case
+// fires the instant the cube is solved, so it visibly "un-solves" itself
+// right in front of the user, reading as a bug rather than progress.
+export const SOLVED_PAUSE_MS = 1200;
 
 export function useAlgorithmTraining(controller: CubeController) {
   const [track, setTrack] = useState<TrainingTrack | null>(null);
@@ -81,7 +88,8 @@ export function useAlgorithmTraining(controller: CubeController) {
     setPhase({ kind: 'timing', algCase: phase.algCase, startedAt: Date.now() });
   }, [phase, controller.moveCount]);
 
-  // Solved while timing -> record the attempt, persist, advance.
+  // Solved while timing -> record the attempt, persist, and hold on the
+  // solved cube for a beat (see SOLVED_PAUSE_MS) before advancing.
   useEffect(() => {
     if (phase.kind !== 'timing') return;
     if (controller.facelets !== SOLVED_STATE) return;
@@ -91,8 +99,18 @@ export function useAlgorithmTraining(controller: CubeController) {
     saveProgress(track, nextProgress);
     setProgress(nextProgress);
     setLastResult({ timeMs });
-    setUpCase(track, nextProgress);
-  }, [phase, controller.facelets, track, progress, setUpCase]);
+    setPhase({ kind: 'solved', algCase: phase.algCase });
+  }, [phase, controller.facelets, track, progress]);
+
+  // After the pause, advance to the next attempt (same case again, or the
+  // next one if the streak just hit mastery - setUpCase/currentCase already
+  // resolve that from the persisted progress set above).
+  useEffect(() => {
+    if (phase.kind !== 'solved') return;
+    if (!track || !progress) return;
+    const timer = setTimeout(() => setUpCase(track, progress), SOLVED_PAUSE_MS);
+    return () => clearTimeout(timer);
+  }, [phase, track, progress, setUpCase]);
 
   // "Vis løsning" must let the demo animation actually play before setting
   // up the next attempt — calling setUpCase right away would call
