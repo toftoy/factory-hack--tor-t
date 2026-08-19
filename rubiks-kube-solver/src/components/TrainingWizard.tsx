@@ -5,7 +5,12 @@ import { SOLVED_PAUSE_MS, type AlgorithmTraining } from '../hooks/useAlgorithmTr
 interface Props {
   training: AlgorithmTraining;
   onExit: () => void;
+  onResetCamera: () => void;
 }
+
+// How long a tap-to-arm confirm button stays armed before reverting on its
+// own, if the second (confirming) tap never comes.
+const CONFIRM_ARM_MS = 3000;
 
 function formatTime(ms: number): string {
   return (ms / 1000).toFixed(2) + 's';
@@ -31,12 +36,27 @@ function Confetti() {
   );
 }
 
-export function TrainingWizard({ training, onExit }: Props) {
+export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
   const { phase, track, progress, lastResult, giveUp, skip, resetTrack } = training;
 
-  const handleReset = () => {
-    if (window.confirm('Nullstille fremgangen for dette sporet? Du mister stjernene dine.')) {
+  // Resetting progress is destructive (wipes earned stars), so it needs a
+  // real confirmation - but window.confirm() doesn't reliably work inside a
+  // sandboxed iframe (e.g. the Claude Artifact viewer), so this is a
+  // same-page tap-to-arm pattern instead: first tap arms it (and shows what
+  // a second tap will do), second tap within CONFIRM_ARM_MS actually resets.
+  const [resetArmed, setResetArmed] = useState(false);
+  useEffect(() => {
+    if (!resetArmed) return;
+    const timer = setTimeout(() => setResetArmed(false), CONFIRM_ARM_MS);
+    return () => clearTimeout(timer);
+  }, [resetArmed]);
+
+  const handleResetTap = () => {
+    if (resetArmed) {
+      setResetArmed(false);
       resetTrack();
+    } else {
+      setResetArmed(true);
     }
   };
 
@@ -63,7 +83,7 @@ export function TrainingWizard({ training, onExit }: Props) {
           <div className="training-complete-title">Sporet er fullført!</div>
           <div className="training-complete-subtitle">Du klarte alle {TRACKS[track].length} casene. Kjempebra jobbet!</div>
           <div className="training-complete-actions">
-            <button onClick={handleReset} className="training-skip-btn">
+            <button onClick={resetTrack} className="training-skip-btn">
               🔄 Prøv igjen
             </button>
             <button onClick={onExit} className="training-exit training-complete-exit">
@@ -101,13 +121,8 @@ export function TrainingWizard({ training, onExit }: Props) {
         <span className="training-case-name">
           {algCase.name} <span className="training-case-number">({caseNumber}/{caseCount})</span>
         </span>
-        <button
-          onClick={handleReset}
-          className="training-reset"
-          disabled={phase.kind === 'demonstrating'}
-          aria-label="Nullstill sporet"
-        >
-          ↺
+        <button onClick={onResetCamera} className="training-reset" aria-label="Nullstill kameravisning">
+          🧭
         </button>
         <button onClick={onExit} className="training-exit">
           ✕
@@ -154,6 +169,13 @@ export function TrainingWizard({ training, onExit }: Props) {
               disabled={phase.kind === 'solved' || phase.kind === 'demonstrating'}
             >
               Hopp over
+            </button>
+            <button
+              className={'training-reset-progress-btn' + (resetArmed ? ' training-reset-progress-armed' : '')}
+              onClick={handleResetTap}
+              disabled={phase.kind === 'demonstrating'}
+            >
+              {resetArmed ? 'Sikker? 🗑️' : '🗑️ Nullstill'}
             </button>
           </div>
         </div>

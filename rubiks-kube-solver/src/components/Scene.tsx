@@ -1,13 +1,20 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { ContactShadows, OrbitControls } from '@react-three/drei';
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { PerspectiveCamera as ThreePerspectiveCamera } from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { CubeController } from '../hooks/useCubeController';
 import { RubiksCube } from './RubiksCube';
 
 interface Props {
   controller: CubeController;
   turnsPerSecond: number;
+}
+
+export interface SceneHandle {
+  /** Snaps the (freely orbit-able) camera back to its starting position -
+   * e.g. after rotating around to reach a face the default view hides. */
+  resetCamera: () => void;
 }
 
 const BASE_VERTICAL_FOV = 40;
@@ -33,8 +40,13 @@ function ResponsiveCamera() {
   return null;
 }
 
-export function Scene({ controller, turnsPerSecond }: Props) {
+export const Scene = forwardRef<SceneHandle, Props>(function Scene({ controller, turnsPerSecond }, ref) {
   const [orbitEnabled, setOrbitEnabled] = useState(true);
+  const orbitControlsRef = useRef<OrbitControlsImpl>(null);
+
+  useImperativeHandle(ref, () => ({
+    resetCamera: () => orbitControlsRef.current?.reset(),
+  }));
 
   return (
     <Canvas shadows camera={{ position: [4.5, 4, 5.5], fov: BASE_VERTICAL_FOV }}>
@@ -49,7 +61,7 @@ export function Scene({ controller, turnsPerSecond }: Props) {
         onGrabbingChange={(grabbing) => setOrbitEnabled(!grabbing)}
       />
       <ContactShadows position={[0, -1.8, 0]} opacity={0.5} scale={10} blur={2.5} far={4} />
-      <OrbitControls enabled={orbitEnabled} enablePan={false} minDistance={5} maxDistance={14} />
+      <OrbitControls ref={orbitControlsRef} enabled={orbitEnabled} enablePan={false} minDistance={5} maxDistance={14} />
     </Canvas>
   );
-}
+});

@@ -501,6 +501,20 @@ input[type='range'] {
   background: #4d3a99;
 }
 
+.training-reset-progress-btn {
+  background: var(--train-border);
+  font-size: 0.78rem;
+}
+
+.training-reset-progress-btn:hover:not(:disabled) {
+  background: #4d3a99;
+}
+
+.training-reset-progress-armed,
+.training-reset-progress-armed:hover:not(:disabled) {
+  background: var(--train-coral);
+}
+
 /* Celebration: confetti + track-complete */
 
 @keyframes training-card-pop {

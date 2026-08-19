@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ControlPanel } from './components/ControlPanel';
-import { Scene } from './components/Scene';
+import { Scene, type SceneHandle } from './components/Scene';
 import { ScanReview } from './components/ScanReview';
 import { ScanWizard } from './components/ScanWizard';
 import { TrainingWizard } from './components/TrainingWizard';
@@ -19,6 +19,8 @@ export default function App() {
   const [speed, setSpeed] = useState(2.2);
   const [lastScramble, setLastScramble] = useState('');
   const [lastSolution, setLastSolution] = useState('');
+  const sceneRef = useRef<SceneHandle>(null);
+  const handleResetCamera = useCallback(() => sceneRef.current?.resetCamera(), []);
 
   const clearLogs = useCallback(() => {
     setLastScramble('');
@@ -58,8 +60,10 @@ export default function App() {
   return (
     <div className="app">
       <div className="viewport">
-        <Scene controller={controller} turnsPerSecond={speed} />
-        {training.track && <TrainingWizard training={training} onExit={training.stop} />}
+        <Scene ref={sceneRef} controller={controller} turnsPerSecond={speed} />
+        {training.track && (
+          <TrainingWizard training={training} onExit={training.stop} onResetCamera={handleResetCamera} />
+        )}
       </div>
       {!training.track && (
         <ControlPanel

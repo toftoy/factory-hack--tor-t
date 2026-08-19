@@ -56,7 +56,8 @@ export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
     name: 'L',
     setupMoves: "L'",
     solutionMoves: 'L',
-    description: 'L snur venstre side med klokken. Drei kameraet litt (dra utenfor kuben) så du ser den godt.',
+    description:
+      'L snur venstre side med klokken. Drei kameraet litt (dra utenfor kuben) så du ser den godt - trykk 🧭 for å komme tilbake.',
   },
   {
     id: 'notation-f',
@@ -81,7 +82,7 @@ export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: "D'",
     solutionMoves: 'D',
     description:
-      'D snur bunnen med klokken (sett nedenfra). Drei kameraet (dra utenfor kuben) til du ser bunnen godt.',
+      'D snur bunnen med klokken (sett nedenfra). Drei kameraet (dra utenfor kuben) til du ser bunnen godt - trykk 🧭 for å komme tilbake til vanlig visning.',
   },
   {
     id: 'notation-b',
@@ -90,7 +91,7 @@ export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: "B'",
     solutionMoves: 'B',
     description:
-      '🔄 Baksiden er gjemt! Dra utenfor kuben for å dreie kameraet helt rundt til du ser den, snu den så B med klokken. Nå har du lært alle seks sidene!',
+      '🔄 Baksiden er gjemt! Dra utenfor kuben for å dreie kameraet helt rundt til du ser den, snu den så B med klokken. Sitter du fast, trykk 🧭 for å komme tilbake. Nå har du lært alle seks sidene!',
   },
 ];
 
