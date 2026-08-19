@@ -94,14 +94,6 @@ export function recordAttempt(
   };
 }
 
-export function showSolution(progress: TrackProgress, caseId: string): TrackProgress {
-  const prevStats = statsFor(progress, caseId);
-  return {
-    ...progress,
-    stats: { ...progress.stats, [caseId]: { ...prevStats, streak: 0 } },
-  };
-}
-
 export function skipCase(track: TrainingTrack, progress: TrackProgress): TrackProgress {
   if (progress.currentIndex >= TRACKS[track].length) return progress;
   return { ...progress, currentIndex: progress.currentIndex + 1 };

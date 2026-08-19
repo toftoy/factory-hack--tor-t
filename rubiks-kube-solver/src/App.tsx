@@ -61,23 +61,24 @@ export default function App() {
         <Scene controller={controller} turnsPerSecond={speed} />
         {training.track && <TrainingWizard training={training} onExit={training.stop} />}
       </div>
-      <ControlPanel
-        onScramble={handleScramble}
-        onSolve={handleSolve}
-        onReset={handleReset}
-        onScan={scan.start}
-        onTrain={training.start}
-        isAnimating={controller.isAnimating}
-        isScanning={scan.phase.kind !== 'idle'}
-        isTraining={training.track !== null}
-        isSolved={isSolved}
-        solverStatus={solverStatus}
-        moveCount={controller.moveCount}
-        speed={speed}
-        onSpeedChange={setSpeed}
-        lastScramble={lastScramble}
-        lastSolution={lastSolution}
-      />
+      {!training.track && (
+        <ControlPanel
+          onScramble={handleScramble}
+          onSolve={handleSolve}
+          onReset={handleReset}
+          onScan={scan.start}
+          onTrain={training.start}
+          isAnimating={controller.isAnimating}
+          isScanning={scan.phase.kind !== 'idle'}
+          isSolved={isSolved}
+          solverStatus={solverStatus}
+          moveCount={controller.moveCount}
+          speed={speed}
+          onSpeedChange={setSpeed}
+          lastScramble={lastScramble}
+          lastSolution={lastSolution}
+        />
+      )}
       {(scan.phase.kind === 'capturing' || scan.phase.kind === 'capturingD') && (
         <ScanWizard scan={scan} onCancel={scan.cancel} />
       )}

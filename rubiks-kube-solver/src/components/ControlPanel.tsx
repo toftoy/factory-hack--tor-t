@@ -9,7 +9,6 @@ interface Props {
   onTrain: (track: TrainingTrack) => void;
   isAnimating: boolean;
   isScanning: boolean;
-  isTraining: boolean;
   isSolved: boolean;
   solverStatus: SolverStatus;
   moveCount: number;
@@ -27,7 +26,6 @@ export function ControlPanel({
   onTrain,
   isAnimating,
   isScanning,
-  isTraining,
   isSolved,
   solverStatus,
   moveCount,
@@ -36,8 +34,7 @@ export function ControlPanel({
   lastScramble,
   lastSolution,
 }: Props) {
-  const otherFeatureActive = isScanning || isTraining;
-  const solveDisabled = isAnimating || otherFeatureActive || solverStatus !== 'ready' || isSolved;
+  const solveDisabled = isAnimating || isScanning || solverStatus !== 'ready' || isSolved;
   const solveLabel =
     solverStatus === 'initializing'
       ? 'Initialiserer løser…'
@@ -54,16 +51,16 @@ export function ControlPanel({
       </div>
 
       <div className="button-row">
-        <button onClick={onScramble} disabled={isAnimating || otherFeatureActive}>
+        <button onClick={onScramble} disabled={isAnimating || isScanning}>
           Bland
         </button>
         <button onClick={onSolve} disabled={solveDisabled}>
           {solveLabel}
         </button>
-        <button onClick={onReset} disabled={isAnimating || otherFeatureActive}>
+        <button onClick={onReset} disabled={isAnimating || isScanning}>
           Nullstill
         </button>
-        <button onClick={onScan} disabled={isAnimating || isTraining}>
+        <button onClick={onScan} disabled={isAnimating}>
           Skann
         </button>
       </div>

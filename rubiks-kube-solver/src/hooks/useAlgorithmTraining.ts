@@ -6,7 +6,6 @@ import {
   loadProgress,
   recordAttempt,
   saveProgress,
-  showSolution,
   skipCase,
   type TrackProgress,
 } from '../cube/trainingProgress';
@@ -100,15 +99,14 @@ export function useAlgorithmTraining(controller: CubeController) {
   // controller.reset() and wipe the just-enqueued demo moves before they
   // ever animate. So this only enqueues the demo and marks 'demonstrating';
   // the effect below advances to a fresh attempt once it's done playing.
+  // Asking for help doesn't touch progress at all - it's not a failure, so
+  // the streak (and every other stat) is left exactly as it was.
   const giveUp = useCallback(() => {
     if (phase.kind !== 'timing' && phase.kind !== 'ready') return;
     if (!track || !progress) return;
     const algCase = phase.algCase;
     controller.reset();
     controller.enqueue(`${algCase.setupMoves} ${algCase.solutionMoves}`);
-    const nextProgress = showSolution(progress, algCase.id);
-    saveProgress(track, nextProgress);
-    setProgress(nextProgress);
     setLastResult(null);
     setPhase({ kind: 'demonstrating', algCase });
   }, [phase, track, progress, controller]);

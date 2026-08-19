@@ -109,6 +109,7 @@ h1 {
 
 button {
   flex: 1;
+  min-height: 44px;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--panel-border);
@@ -309,38 +310,35 @@ input[type='range'] {
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  gap: 12px;
+  padding: 12px;
+  gap: 8px;
   overflow-y: auto;
 }
 
+/* Slim single-row strip pinned to the top - deliberately small so the cube
+   face(s) the current case is teaching stay visible underneath, instead of
+   being covered by HUD chrome (the whole reason this layout exists). */
 .training-header {
   pointer-events: auto;
+  flex: none;
   background: var(--train-bg);
-  border: 3px solid var(--train-accent);
-  border-radius: 20px;
-  padding: 14px 18px;
+  border: 2px solid var(--train-accent);
+  border-radius: 14px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.training-case-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 10px;
 }
 
 .training-progress-dots {
   display: flex;
-  gap: 6px;
+  gap: 5px;
+  flex: none;
 }
 
 .training-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--train-border);
 }
@@ -355,41 +353,61 @@ input[type='range'] {
 }
 
 .training-case-name {
-  font-size: 1.2rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
   font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .training-case-number {
-  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--text-muted);
 }
 
 .training-exit {
   pointer-events: auto;
   flex: none;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
   background: var(--train-coral);
-  border-radius: 14px;
-  padding: 10px 16px;
+  border-radius: 12px;
   font-weight: 700;
+  font-size: 1.1rem;
 }
 
 .training-exit:hover:not(:disabled) {
   background: var(--train-coral-hover);
 }
 
+/* Move-card and footer are grouped together and pushed to the bottom of the
+   HUD as one unit, leaving the whole middle of the screen - where the cube
+   itself renders - clear. */
+.training-bottom-stack {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .training-move-card {
   pointer-events: auto;
-  align-self: center;
-  max-width: 100%;
   background: linear-gradient(135deg, var(--train-accent), #5a2fd6);
-  border-radius: 24px;
-  padding: 20px 24px;
+  border-radius: 20px;
+  padding: 14px 20px;
   text-align: center;
   box-shadow: 0 8px 24px rgba(124, 77, 255, 0.4);
 }
 
+.training-move-card-celebrate {
+  animation: training-card-pop 0.4s ease;
+}
+
 .training-move-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: #d9c9ff;
   font-weight: 700;
   text-transform: uppercase;
@@ -400,62 +418,53 @@ input[type='range'] {
   display: inline-block;
   background: white;
   color: #4a1fb8;
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   font-weight: 900;
   font-family: 'SFMono-Regular', Consolas, monospace;
-  padding: 6px 20px;
-  border-radius: 16px;
+  padding: 4px 16px;
+  border-radius: 14px;
   letter-spacing: 1px;
-  margin: 8px 0;
+  margin: 6px 0;
   word-break: break-word;
 }
 
 .training-move-desc {
-  margin-top: 4px;
-  font-size: 1rem;
+  margin-top: 2px;
+  font-size: 0.92rem;
   color: white;
   font-weight: 600;
 }
 
+.training-move-time {
+  font-size: 2rem;
+  font-weight: 900;
+  color: white;
+  margin-top: 4px;
+}
+
 .training-status {
-  margin-top: 10px;
-  font-size: 0.9rem;
+  margin-top: 8px;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #ffe89a;
 }
 
-.training-status-success {
-  color: var(--train-good);
-}
-
 .training-footer {
   pointer-events: auto;
-  margin-top: auto;
   background: var(--train-bg);
-  border: 3px solid var(--train-accent);
-  border-radius: 20px;
-  padding: 12px 16px;
+  border: 2px solid var(--train-accent);
+  border-radius: 16px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.training-streak {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .training-streak-stars {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   letter-spacing: 2px;
-}
-
-.training-best-time {
-  font-size: 0.75rem;
-  color: var(--text-muted);
 }
 
 .training-actions {
@@ -478,4 +487,82 @@ input[type='range'] {
 
 .training-skip-btn:hover:not(:disabled) {
   background: #4d3a99;
+}
+
+/* Celebration: confetti + track-complete */
+
+@keyframes training-card-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes training-confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(540deg);
+    opacity: 0.6;
+  }
+}
+
+.training-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.training-confetti-piece {
+  position: absolute;
+  top: -12px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  animation: training-confetti-fall 1.6s ease-in forwards;
+}
+
+.training-complete-card {
+  pointer-events: auto;
+  margin: auto;
+  max-width: 320px;
+  background: linear-gradient(135deg, var(--train-accent), #5a2fd6);
+  border-radius: 28px;
+  padding: 32px 28px;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(124, 77, 255, 0.5);
+  animation: training-card-pop 0.5s ease;
+}
+
+.training-complete-emoji {
+  font-size: 3.5rem;
+}
+
+.training-complete-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: white;
+  margin-top: 8px;
+}
+
+.training-complete-subtitle {
+  font-size: 0.95rem;
+  color: #d9c9ff;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.training-complete-exit {
+  pointer-events: auto;
+  width: auto;
+  margin-top: 20px;
+  padding: 0 24px;
 }
