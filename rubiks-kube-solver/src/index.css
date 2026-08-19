@@ -615,3 +615,38 @@ input[type='range'] {
   width: auto;
   padding: 0 24px;
 }
+
+.journey-cta {
+  flex: none;
+  min-height: 56px;
+  font-size: 1.05rem;
+  background: linear-gradient(135deg, var(--train-accent), #5a2fd6);
+  box-shadow: 0 6px 18px rgba(124, 77, 255, 0.4);
+}
+
+.journey-cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.advanced-toggle {
+  flex: none;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  text-align: left;
+  min-height: 0;
+}
+
+.advanced-toggle:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+}
+
+.advanced-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

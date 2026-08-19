@@ -10,12 +10,16 @@ import { useSolver } from './cube/useSolver';
 import { useCubeController } from './hooks/useCubeController';
 import { useCubeScan } from './hooks/useCubeScan';
 import { useAlgorithmTraining } from './hooks/useAlgorithmTraining';
+import { useGuidedJourney } from './hooks/useGuidedJourney';
+import { GuidedJourney } from './components/GuidedJourney';
+import { isTrackComplete, loadProgress } from './cube/trainingProgress';
 
 export default function App() {
   const controller = useCubeController();
   const { status: solverStatus, solve } = useSolver();
   const scan = useCubeScan();
   const training = useAlgorithmTraining(controller);
+  const journey = useGuidedJourney(controller);
   const [speed, setSpeed] = useState(2.2);
   const [lastScramble, setLastScramble] = useState('');
   const [lastSolution, setLastSolution] = useState('');
@@ -55,6 +59,14 @@ export default function App() {
     [controller, scan, clearLogs]
   );
 
+  const handleStartJourney = useCallback(() => {
+    if (!isTrackComplete('notation', loadProgress('notation'))) {
+      training.start('notation');
+      return;
+    }
+    journey.start();
+  }, [training, journey]);
+
   const isSolved = controller.facelets === SOLVED_STATE;
 
   return (
@@ -64,14 +76,18 @@ export default function App() {
         {training.track && (
           <TrainingWizard training={training} onExit={training.stop} onResetCamera={handleResetCamera} />
         )}
+        {journey.active && (
+          <GuidedJourney journey={journey} onExit={journey.exit} onResetCamera={handleResetCamera} />
+        )}
       </div>
-      {!training.track && (
+      {!training.track && !journey.active && (
         <ControlPanel
           onScramble={handleScramble}
           onSolve={handleSolve}
           onReset={handleReset}
           onScan={scan.start}
           onTrain={training.start}
+          onStartJourney={handleStartJourney}
           isAnimating={controller.isAnimating}
           isScanning={scan.phase.kind !== 'idle'}
           isSolved={isSolved}
