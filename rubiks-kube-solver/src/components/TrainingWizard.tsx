@@ -19,9 +19,9 @@ export function TrainingWizard({ training, onExit }: Props) {
     return (
       <div className="training-hud">
         <div className="training-header">
-          <span>Sporet er fullført! 🎉</span>
-          <button onClick={onExit} className="scan-close">
-            Avslutt
+          <span className="training-case-name">Sporet er fullført! 🎉</span>
+          <button onClick={onExit} className="training-exit">
+            ✕ Avslutt
           </button>
         </div>
       </div>
@@ -30,41 +30,68 @@ export function TrainingWizard({ training, onExit }: Props) {
 
   const algCase = phase.algCase;
   const stats = progress.stats[algCase.id];
+  const caseCount = TRACKS[track].length;
   const caseNumber = progress.currentIndex + 1;
 
   return (
     <div className="training-hud">
       <div className="training-header">
         <div className="training-case-info">
-          <span className="training-case-number">
-            Case {caseNumber}/{TRACKS[track].length}
-          </span>
+          <div className="training-progress-dots">
+            {Array.from({ length: caseCount }, (_, i) => (
+              <span
+                key={i}
+                className={
+                  'training-dot' +
+                  (i < progress.currentIndex ? ' training-dot-done' : '') +
+                  (i === progress.currentIndex ? ' training-dot-current' : '')
+                }
+              />
+            ))}
+          </div>
           <span className="training-case-name">{algCase.name}</span>
+          <span className="training-case-number">
+            Case {caseNumber}/{caseCount}
+          </span>
         </div>
-        <button onClick={onExit} className="scan-close">
-          Avslutt
+        <button onClick={onExit} className="training-exit">
+          ✕ Avslutt
         </button>
       </div>
 
-      <p className="training-description">{algCase.description}</p>
-      <p className="training-hint">{algCase.solutionMoves}</p>
-
-      {phase.kind === 'timing' && <p className="training-timing">Tar tid…</p>}
-      {phase.kind === 'demonstrating' && <p className="training-timing">Viser løsning…</p>}
-      {lastResult && phase.kind === 'setting-up' && (
-        <p className="training-last-result">Riktig! {formatTime(lastResult.timeMs)}</p>
-      )}
+      <div className="training-move-card">
+        <div className="training-move-label">Gjør dette trekket</div>
+        <div className="training-move-chip">{algCase.solutionMoves}</div>
+        <div className="training-move-desc">{algCase.description}</div>
+        {phase.kind === 'ready' && (
+          <div className="training-status">Klar? Gjør et trekk for å starte! ⏱️</div>
+        )}
+        {phase.kind === 'timing' && <div className="training-status">Tar tid… ⏱️</div>}
+        {phase.kind === 'demonstrating' && <div className="training-status">Se her! 👀</div>}
+        {lastResult && phase.kind === 'setting-up' && (
+          <div className="training-status training-status-success">
+            Riktig! ⭐ {formatTime(lastResult.timeMs)}
+          </div>
+        )}
+      </div>
 
       <div className="training-footer">
-        <div className="training-stats">
-          <span>Streak: {stats?.streak ?? 0}/3</span>
-          {stats?.bestTimeMs != null && <span>Beste: {formatTime(stats.bestTimeMs)}</span>}
+        <div className="training-streak">
+          <span className="training-streak-stars">
+            {'⭐'.repeat(stats?.streak ?? 0)}
+            {'☆'.repeat(3 - (stats?.streak ?? 0))}
+          </span>
+          {stats?.bestTimeMs != null && <span className="training-best-time">Beste: {formatTime(stats.bestTimeMs)}</span>}
         </div>
         <div className="training-actions">
-          <button onClick={giveUp} disabled={phase.kind === 'setting-up' || phase.kind === 'demonstrating'}>
-            Vis løsning
+          <button
+            className="training-help-btn"
+            onClick={giveUp}
+            disabled={phase.kind === 'setting-up' || phase.kind === 'demonstrating'}
+          >
+            💡 Vis meg
           </button>
-          <button onClick={skip} disabled={phase.kind === 'demonstrating'}>
+          <button className="training-skip-btn" onClick={skip} disabled={phase.kind === 'demonstrating'}>
             Hopp over
           </button>
         </div>

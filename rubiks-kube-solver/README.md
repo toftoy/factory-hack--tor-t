@@ -24,7 +24,11 @@ two-phase-algoritme, med animerte trekk i 3D.
 - **Tren på algoritmer**: øv på navngitte kube-algoritmer (nybegynnermetode
   eller 2-look OLL/PLL) direkte på 3D-kuben — appen setter opp et kjent
   case, du løser det selv ved å dra i lag, og appen tar tid og styrer
-  fremgang med et 3-på-rad-krav for å låse opp neste algoritme.
+  fremgang med et 3-på-rad-krav for å låse opp neste algoritme. Et eget
+  notasjons-spor ("Tren: Notasjon") lærer bort hva bokstaver og symboler
+  betyr (f.eks. U, U', U2) med noen få enkle trekk, og må fullføres én gang
+  før nybegynner- eller 2-look-sporet blir tilgjengelig — det forblir
+  tilgjengelig for gjenbesøk etterpå.
 
 ## Kom i gang
 

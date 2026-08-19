@@ -59,6 +59,7 @@ export default function App() {
     <div className="app">
       <div className="viewport">
         <Scene controller={controller} turnsPerSecond={speed} />
+        {training.track && <TrainingWizard training={training} onExit={training.stop} />}
       </div>
       <ControlPanel
         onScramble={handleScramble}
@@ -88,7 +89,6 @@ export default function App() {
           onCancel={scan.cancel}
         />
       )}
-      {training.track && <TrainingWizard training={training} onExit={training.stop} />}
     </div>
   );
 }

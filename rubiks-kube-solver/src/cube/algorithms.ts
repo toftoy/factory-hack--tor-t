@@ -1,4 +1,4 @@
-export type TrainingTrack = 'beginner' | 'oll-pll-2look';
+export type TrainingTrack = 'notation' | 'beginner' | 'oll-pll-2look';
 
 export interface AlgorithmCase {
   id: string;
@@ -8,6 +8,49 @@ export interface AlgorithmCase {
   solutionMoves: string;
   description: string;
 }
+
+export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'notation-u',
+    track: 'notation',
+    name: 'U',
+    setupMoves: "U'",
+    solutionMoves: 'U',
+    description: 'U snur toppen ett hakk med klokken.',
+  },
+  {
+    id: 'notation-u-prime',
+    track: 'notation',
+    name: "U'",
+    setupMoves: 'U',
+    solutionMoves: "U'",
+    description: "Apostrofen (') betyr mot klokken - U' snur toppen ett hakk mot klokken.",
+  },
+  {
+    id: 'notation-u2',
+    track: 'notation',
+    name: 'U2',
+    setupMoves: 'U2',
+    solutionMoves: 'U2',
+    description: '2-tallet betyr dobbelt så mye - U2 snur toppen et helt halvt hakk.',
+  },
+  {
+    id: 'notation-r',
+    track: 'notation',
+    name: 'R',
+    setupMoves: "R'",
+    solutionMoves: 'R',
+    description: 'Hver bokstav er en side av kuben - R snur høyre side med klokken.',
+  },
+  {
+    id: 'notation-r-prime',
+    track: 'notation',
+    name: "R'",
+    setupMoves: 'R',
+    solutionMoves: "R'",
+    description: "R' snur høyre side mot klokken - samme regel som for U.",
+  },
+];
 
 export const BEGINNER_ALGORITHMS: AlgorithmCase[] = [
   {
@@ -176,6 +219,7 @@ export const OLL_PLL_2LOOK_ALGORITHMS: AlgorithmCase[] = [
 ];
 
 export const TRACKS: Record<TrainingTrack, AlgorithmCase[]> = {
+  notation: NOTATION_ALGORITHMS,
   beginner: BEGINNER_ALGORITHMS,
   'oll-pll-2look': OLL_PLL_2LOOK_ALGORITHMS,
 };

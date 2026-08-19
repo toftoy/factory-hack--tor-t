@@ -69,10 +69,17 @@ export function ControlPanel({
       </div>
 
       <div className="button-row">
-        <button onClick={() => onTrain('beginner')} disabled={isAnimating || isScanning}>
+        <button className="train-button" onClick={() => onTrain('notation')} disabled={isAnimating || isScanning}>
+          Tren: Notasjon
+        </button>
+        <button className="train-button" onClick={() => onTrain('beginner')} disabled={isAnimating || isScanning}>
           Tren: Nybegynner
         </button>
-        <button onClick={() => onTrain('oll-pll-2look')} disabled={isAnimating || isScanning}>
+        <button
+          className="train-button"
+          onClick={() => onTrain('oll-pll-2look')}
+          disabled={isAnimating || isScanning}
+        >
           Tren: 2-look OLL/PLL
         </button>
       </div>

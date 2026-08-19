@@ -42,13 +42,18 @@ export function useAlgorithmTraining(controller: CubeController) {
     [controller]
   );
 
+  // First-time users must complete the notation lesson before either real
+  // training track - starting "beginner"/"oll-pll-2look" redirects to
+  // "notation" until it's been mastered once. "notation" itself is never
+  // gated, so it's always directly reachable (including to revisit later).
   const start = useCallback(
     (t: TrainingTrack) => {
-      const p = loadProgress(t);
-      setTrack(t);
+      const target = t !== 'notation' && !isTrackComplete('notation', loadProgress('notation')) ? 'notation' : t;
+      const p = loadProgress(target);
+      setTrack(target);
       setProgress(p);
       setLastResult(null);
-      setUpCase(t, p);
+      setUpCase(target, p);
     },
     [setUpCase]
   );

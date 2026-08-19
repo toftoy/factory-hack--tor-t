@@ -8,6 +8,14 @@
   --accent: #4f7cff;
   --accent-hover: #6a90ff;
   --danger: #2a2a35;
+  --train-accent: #7c4dff;
+  --train-accent-hover: #9670ff;
+  --train-bg: #241a4d;
+  --train-border: #3d2d7a;
+  --train-coral: #ff5470;
+  --train-coral-hover: #ff7188;
+  --train-star: #ffb703;
+  --train-good: #06d6a0;
   font-family: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
 }
 
@@ -37,6 +45,7 @@ body {
 .viewport {
   flex: 1;
   min-width: 0;
+  position: relative;
 }
 
 .panel {
@@ -90,7 +99,12 @@ h1 {
 
 .button-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.train-button {
+  min-width: 100px;
 }
 
 button {
@@ -114,6 +128,14 @@ button:disabled {
   background: var(--danger);
   color: var(--text-muted);
   cursor: not-allowed;
+}
+
+.train-button {
+  background: var(--train-accent);
+}
+
+.train-button:hover:not(:disabled) {
+  background: var(--train-accent-hover);
 }
 
 .speed-control {
@@ -281,24 +303,23 @@ input[type='range'] {
 }
 
 .training-hud {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 15;
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   padding: 16px;
   gap: 12px;
+  overflow-y: auto;
 }
 
-.training-header,
-.training-footer {
+.training-header {
   pointer-events: auto;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 12px 16px;
+  background: var(--train-bg);
+  border: 3px solid var(--train-accent);
+  border-radius: 20px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -309,47 +330,152 @@ input[type='range'] {
 .training-case-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.training-case-number {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+.training-progress-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.training-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--train-border);
+}
+
+.training-dot-done {
+  background: var(--train-good);
+}
+
+.training-dot-current {
+  background: var(--train-star);
+  box-shadow: 0 0 0 3px rgba(255, 183, 3, 0.3);
 }
 
 .training-case-name {
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 
-.training-description,
-.training-hint,
-.training-timing,
-.training-last-result {
-  pointer-events: none;
-  align-self: flex-start;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 6px 12px;
-  margin: 0;
-  font-size: 0.85rem;
+.training-case-number {
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
-.training-hint {
-  font-family: monospace;
-  color: var(--text);
+.training-exit {
+  pointer-events: auto;
+  flex: none;
+  background: var(--train-coral);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-weight: 700;
 }
 
-.training-stats {
+.training-exit:hover:not(:disabled) {
+  background: var(--train-coral-hover);
+}
+
+.training-move-card {
+  pointer-events: auto;
+  align-self: center;
+  max-width: 100%;
+  background: linear-gradient(135deg, var(--train-accent), #5a2fd6);
+  border-radius: 24px;
+  padding: 20px 24px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(124, 77, 255, 0.4);
+}
+
+.training-move-label {
+  font-size: 0.8rem;
+  color: #d9c9ff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.training-move-chip {
+  display: inline-block;
+  background: white;
+  color: #4a1fb8;
+  font-size: 1.8rem;
+  font-weight: 900;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  padding: 6px 20px;
+  border-radius: 16px;
+  letter-spacing: 1px;
+  margin: 8px 0;
+  word-break: break-word;
+}
+
+.training-move-desc {
+  margin-top: 4px;
+  font-size: 1rem;
+  color: white;
+  font-weight: 600;
+}
+
+.training-status {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffe89a;
+}
+
+.training-status-success {
+  color: var(--train-good);
+}
+
+.training-footer {
+  pointer-events: auto;
+  margin-top: auto;
+  background: var(--train-bg);
+  border: 3px solid var(--train-accent);
+  border-radius: 20px;
+  padding: 12px 16px;
   display: flex;
-  gap: 16px;
-  font-size: 0.85rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.training-streak {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.training-streak-stars {
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+}
+
+.training-best-time {
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
 .training-actions {
   display: flex;
   gap: 8px;
+}
+
+.training-help-btn {
+  background: var(--train-star);
+  color: #4a2a00;
+}
+
+.training-help-btn:hover:not(:disabled) {
+  background: #ffc733;
+}
+
+.training-skip-btn {
+  background: var(--train-border);
+}
+
+.training-skip-btn:hover:not(:disabled) {
+  background: #4d3a99;
 }
