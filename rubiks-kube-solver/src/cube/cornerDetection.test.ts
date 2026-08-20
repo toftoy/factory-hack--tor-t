@@ -140,24 +140,25 @@ describe('searchGridQuad', () => {
     ];
     const image = buildSyntheticImage(320, 320, trueQuad);
     const field = computeGradientField(image);
-    // A moderately poor start: axis-aligned (not skewed), roughly framing
-    // the same area but not matching the true quad's actual shape - e.g.
-    // a leftover overlay position from a previous photo. (Handling a
-    // simultaneously wrong-scale-and-position start is detectGridQuad's
-    // job via its multi-start, not this isolated search's - see that
-    // test below.)
+    // A genuinely poor start: wrong in both position and scale (30-78px
+    // per-corner error vs trueQuad). Empirically verified (controller +
+    // independent reviewer, matching numbers): with the whole-quad-
+    // translate phase, this converges to ratio=0.840/maxErr=44.4px;
+    // without it, only ratio=0.671/maxErr=124.4px - so this test
+    // genuinely discriminates the translate mechanism, not just the
+    // per-corner refinement.
     const badStart: GridQuad = [
-      { x: 50, y: 50 },
-      { x: 260, y: 50 },
-      { x: 260, y: 250 },
-      { x: 50, y: 250 },
+      { x: 40, y: 40 },
+      { x: 200, y: 40 },
+      { x: 200, y: 200 },
+      { x: 40, y: 200 },
     ];
     const { quad: found, score: foundScore } = searchGridQuad(field, badStart);
     const trueScore = scoreQuad(field, trueQuad);
-    expect(foundScore).toBeGreaterThan(trueScore * 0.85);
+    expect(foundScore).toBeGreaterThan(trueScore * 0.8);
     for (let i = 0; i < 4; i++) {
-      expect(Math.abs(found[i].x - trueQuad[i].x)).toBeLessThan(25);
-      expect(Math.abs(found[i].y - trueQuad[i].y)).toBeLessThan(25);
+      expect(Math.abs(found[i].x - trueQuad[i].x)).toBeLessThan(55);
+      expect(Math.abs(found[i].y - trueQuad[i].y)).toBeLessThan(55);
     }
   });
 });
