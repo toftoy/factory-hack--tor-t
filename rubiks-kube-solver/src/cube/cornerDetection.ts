@@ -88,14 +88,24 @@ function sampleLineEnergy(field: GradientField, a: Point, b: Point): number {
 }
 
 /** Scores how well a candidate quad's two internal vertical and two
- * internal horizontal grid lines align with strong edges in the field -
- * a real cube face has a high-contrast cross-hatch there. Higher is better. */
+ * internal horizontal grid lines - plus its four outer boundary edges -
+ * align with strong edges in the field: a real cube face has a
+ * high-contrast cross-hatch inside and a hard outline around it. Higher
+ * is better. The outer edges matter a lot: without them the internal
+ * cross-hatch alone leaves the quad's overall position/scale
+ * under-constrained, and the search happily settles on a shifted or
+ * shrunken quad whose internal lines still land on *some* edges. */
 export function scoreQuad(field: GradientField, quad: GridQuad): number {
+  const [tl, tr, br, bl] = quad;
   const lines: [Point, Point][] = [
     [quadPoint(quad, 1 / 3, 0), quadPoint(quad, 1 / 3, 1)],
     [quadPoint(quad, 2 / 3, 0), quadPoint(quad, 2 / 3, 1)],
     [quadPoint(quad, 0, 1 / 3), quadPoint(quad, 1, 1 / 3)],
     [quadPoint(quad, 0, 2 / 3), quadPoint(quad, 1, 2 / 3)],
+    [tl, tr],
+    [tr, br],
+    [br, bl],
+    [bl, tl],
   ];
   let total = 0;
   for (const [a, b] of lines) total += sampleLineEnergy(field, a, b);
@@ -178,32 +188,44 @@ export interface DetectionResult {
   confidence: number;
 }
 
-// Measured (Task 3) against 24 procedurally-generated synthetic cube-face
-// photos - all 6 real sticker colors as the dominant face, each crossed
-// with 4 camera-angle levels (straight-on, a 10% keystone tilt, and two
-// 25% steep tilts in opposite directions), each cell independently
-// color-jittered +-15 per channel to simulate real-world lighting/color
-// variation: every case that found a real grid (as opposed to falling
-// back on a blank/no-signal image) scored 88-181, regardless of whether
-// the found quad ended up close to the true corners or not (see below).
-// A blank/no-signal image scores <1 (asserted by this file's own
-// fallback test). 20 stays comfortably below every real-grid score
-// measured and well above the blank baseline, so the original starting
-// value holds up and is kept unchanged.
+// Re-measured after scoreQuad started averaging over 8 lines (4 internal
+// + the 4 outer boundary edges) instead of 4, which changes the score's
+// numeric scale, and after ScanWizard started running detection on a
+// 600px-long-side downscaled copy of the photo.
 //
-// Caveat found during that same measurement, left as-is per Task 3's
-// scope (verification/calibration only, not algorithm changes): under
-// perspective (keystone) distortion, searchGridQuad's hill-climbing search
-// sometimes converges to a plausible-but-inaccurate quad that still scores
-// in the same 88-181 range as an accurate one - straight-on detections
-// landed within ~14-22px of the true corners across all 6 colors, but
-// accuracy degraded with tilt severity (10% tilt: ~21-49px error; 25%
-// tilt: ~22-129px error), independent of confidence. So this threshold
-// only gates "was any grid-like pattern found at all" - it cannot, by
-// itself, distinguish an accurate detection from an inaccurate one at a
-// steep angle. Manual drag-to-correct (ScanGridOverlay's draggable corner
-// handles) is the mitigation for that case, not a higher threshold.
-const CONFIDENCE_THRESHOLD = 20;
+// Measurement: 12 procedurally-generated 3024x4032 (real phone-photo
+// resolution) synthetic cube-face photos - 3 sticker colors as the
+// dominant face crossed with 4 camera-angle levels (straight-on, a 10%
+// keystone tilt, and two 25% steep tilts in opposite directions), every
+// pixel color-jittered +-15 per channel - fed end-to-end through the real
+// scan wizard. Every case found a real grid and scored 63.3-166.8.
+// Blank/no-signal baselines measured in the same run: a uniform image
+// scores exactly 0 at both 600x800 and 3024x4032, and a smooth two-stop
+// gradient with no grid at all scores 1.08. So 20 still sits comfortably
+// below every real-grid score and well above the no-signal baseline, and
+// is kept unchanged despite the rescaling.
+//
+// Caveat (unchanged, and re-confirmed by the same run): under perspective
+// (keystone) distortion, searchGridQuad's hill-climbing search sometimes
+// converges to a plausible-but-inaccurate quad that scores in the same
+// range as an accurate one - straight-on detections landed within
+// 63-71px of the true corners (1.6-1.8% of the long side), while tilted
+// ones ranged 69-449px (1.7-11.1%), with no useful correlation to
+// confidence (the single worst case, 449px, scored 122.7 - higher than
+// several near-perfect ones). So this threshold only gates "was any
+// grid-like pattern found at all" - it cannot, by itself, distinguish an
+// accurate detection from an inaccurate one at a steep angle. Manual
+// drag-to-correct (ScanGridOverlay's draggable corner handles) is the
+// mitigation for that case, not a higher threshold.
+export const CONFIDENCE_THRESHOLD = 20;
+
+/** True when detectGridQuad's reported confidence is high enough that a
+ * real grid was found (as opposed to the centered-square fallback). The
+ * UI uses this to decide whether to nudge the user to drag the corners
+ * into place manually. */
+export function isConfidentDetection(confidence: number): boolean {
+  return confidence >= CONFIDENCE_THRESHOLD;
+}
 
 function defaultQuad(width: number, height: number, sizeFraction: number): GridQuad {
   const size = Math.min(width, height) * sizeFraction;

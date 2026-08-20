@@ -106,7 +106,14 @@ describe('scoreQuad', () => {
       { x: 5, y: 35 },
     ];
     const wrongScore = scoreQuad(field, wrongQuad);
-    expect(correctScore).toBeGreaterThan(wrongScore * 5);
+    // Measured with the outer-boundary term included: correct=259.40,
+    // wrong=0.00 - the wrong quad sits entirely inside a blank white
+    // region, so with all 8 lines (4 internal + 4 border) scored it now
+    // picks up literally no gradient energy at all. A plain ratio
+    // assertion would be vacuous against a zero denominator, so assert
+    // both sides directly instead.
+    expect(wrongScore).toBeLessThan(1);
+    expect(correctScore).toBeGreaterThan(150);
   });
 
   test('scores a skewed (non-rectangular) quad correctly, proving perspective handling', () => {
@@ -126,7 +133,9 @@ describe('scoreQuad', () => {
       { x: 50, y: 260 },
     ];
     const axisAlignedScore = scoreQuad(field, axisAlignedGuess);
-    expect(correctScore).toBeGreaterThan(axisAlignedScore * 1.5);
+    // Measured with the outer-boundary term included: correct=283.88,
+    // axis-aligned guess=99.57, ratio=2.85.
+    expect(correctScore).toBeGreaterThan(axisAlignedScore * 2);
   });
 });
 
@@ -141,12 +150,14 @@ describe('searchGridQuad', () => {
     const image = buildSyntheticImage(320, 320, trueQuad);
     const field = computeGradientField(image);
     // A genuinely poor start: wrong in both position and scale (30-78px
-    // per-corner error vs trueQuad). Empirically verified (controller +
-    // independent reviewer, matching numbers): with the whole-quad-
-    // translate phase, this converges to ratio=0.840/maxErr=44.4px;
-    // without it, only ratio=0.671/maxErr=124.4px - so this test
+    // per-corner error vs trueQuad). Re-measured after scoreQuad started
+    // including the four outer boundary edges: with the whole-quad-
+    // translate phase this converges to ratio=1.086/maxErr=2.0px;
+    // without it, only ratio=0.820/maxErr=70.8px - so this test still
     // genuinely discriminates the translate mechanism, not just the
-    // per-corner refinement.
+    // per-corner refinement. (Before the boundary term the same case
+    // converged to ratio=0.840/maxErr=44.4px, so the boundary term is
+    // worth roughly a 20x reduction in corner error here.)
     const badStart: GridQuad = [
       { x: 40, y: 40 },
       { x: 200, y: 40 },
@@ -157,8 +168,8 @@ describe('searchGridQuad', () => {
     const trueScore = scoreQuad(field, trueQuad);
     expect(foundScore).toBeGreaterThan(trueScore * 0.8);
     for (let i = 0; i < 4; i++) {
-      expect(Math.abs(found[i].x - trueQuad[i].x)).toBeLessThan(55);
-      expect(Math.abs(found[i].y - trueQuad[i].y)).toBeLessThan(55);
+      expect(Math.abs(found[i].x - trueQuad[i].x)).toBeLessThan(10);
+      expect(Math.abs(found[i].y - trueQuad[i].y)).toBeLessThan(10);
     }
   });
 });
@@ -173,9 +184,11 @@ describe('detectGridQuad', () => {
     ];
     const image = buildSyntheticImage(360, 340, trueQuad);
     const result = detectGridQuad(image);
+    // Measured with the outer-boundary term included: max per-corner
+    // error 2.1px (was under 20px before it).
     for (let i = 0; i < 4; i++) {
-      expect(Math.abs(result.quad[i].x - trueQuad[i].x)).toBeLessThan(20);
-      expect(Math.abs(result.quad[i].y - trueQuad[i].y)).toBeLessThan(20);
+      expect(Math.abs(result.quad[i].x - trueQuad[i].x)).toBeLessThan(8);
+      expect(Math.abs(result.quad[i].y - trueQuad[i].y)).toBeLessThan(8);
     }
   });
 
