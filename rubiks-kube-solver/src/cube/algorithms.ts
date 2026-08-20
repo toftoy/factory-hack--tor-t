@@ -103,7 +103,7 @@ export const CROSS_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: 'F2',
     solutionMoves: 'F2',
     description:
-      'Kuben ser blandet ut, men se etter en kant-brikke med de to fargene til korset ditt - denne gangen står den rett over plassen sin, bare snudd feil vei. Ett trekk vender den riktig og setter den på plass.',
+      'Kuben ser blandet ut - finn kant-brikken med korsets to farger. Den står rett over plassen, snudd feil vei. Ett trekk retter den opp.',
   },
   {
     id: 'cross-free-then-place',
@@ -112,7 +112,7 @@ export const CROSS_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: "R F'",
     solutionMoves: "F R'",
     description:
-      'Finn kant-brikken med de to fargene til korset ditt - den kan sitte fast et annet sted på kuben. Løsne den først, så setter den seg rett på plass.',
+      'Kuben ser blandet ut - finn kant-brikken med korsets to farger et sted på kuben. Løsne den, så setter den seg selv på plass.',
   },
 ];
 
@@ -124,7 +124,7 @@ export const CORNER_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: "R U R'",
     solutionMoves: "R U' R'",
     description:
-      'Finn hjørnet med fargen til korset ditt på det - løft det ut av lomma, vend det riktig vei, og sett laget tilbake.',
+      'Kuben ser blandet ut - finn hjørnet med korsets farge. Løft det ut av lomma, vend det riktig, og sett laget tilbake.',
   },
   {
     id: 'corner-from-the-side',
@@ -133,7 +133,7 @@ export const CORNER_ALGORITHMS: AlgorithmCase[] = [
     setupMoves: "F' D F",
     solutionMoves: "F' D' F",
     description:
-      'Finn hjørnet med fargen til korset ditt på det - dette trikset drar det ut fra siden og setter det ned riktig vei.',
+      'Kuben ser blandet ut - finn hjørnet med korsets farge på siden. Dette trikset drar det ut og setter det ned riktig vei.',
   },
 ];
 

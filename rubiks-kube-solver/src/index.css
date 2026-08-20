@@ -310,8 +310,8 @@ input[type='range'] {
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  padding: 12px;
-  gap: 8px;
+  padding: 10px;
+  gap: 6px;
   overflow-y: auto;
 }
 
@@ -323,11 +323,11 @@ input[type='range'] {
   flex: none;
   background: var(--train-bg);
   border: 2px solid var(--train-accent);
-  border-radius: 14px;
-  padding: 8px 10px;
+  border-radius: 12px;
+  padding: 6px 8px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .training-progress-dots {
@@ -422,14 +422,14 @@ input[type='range'] {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .training-move-card {
   pointer-events: auto;
   background: linear-gradient(135deg, var(--train-accent), #5a2fd6);
-  border-radius: 20px;
-  padding: 14px 20px;
+  border-radius: 18px;
+  padding: 10px 16px;
   text-align: center;
   box-shadow: 0 8px 24px rgba(124, 77, 255, 0.4);
 }
@@ -439,7 +439,7 @@ input[type='range'] {
 }
 
 .training-move-label {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: #d9c9ff;
   font-weight: 700;
   text-transform: uppercase;
@@ -450,33 +450,34 @@ input[type='range'] {
   display: inline-block;
   background: white;
   color: #4a1fb8;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 900;
   font-family: 'SFMono-Regular', Consolas, monospace;
-  padding: 4px 16px;
-  border-radius: 14px;
+  padding: 3px 12px;
+  border-radius: 12px;
   letter-spacing: 1px;
-  margin: 6px 0;
+  margin: 4px 0;
   word-break: break-word;
 }
 
 .training-move-desc {
   margin-top: 2px;
-  font-size: 0.92rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
   color: white;
   font-weight: 600;
 }
 
 .training-move-time {
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 900;
   color: white;
   margin-top: 4px;
 }
 
 .training-status {
-  margin-top: 8px;
-  font-size: 0.85rem;
+  margin-top: 5px;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #ffe89a;
 }
@@ -485,23 +486,23 @@ input[type='range'] {
   pointer-events: auto;
   background: var(--train-bg);
   border: 2px solid var(--train-accent);
-  border-radius: 16px;
-  padding: 10px 14px;
+  border-radius: 14px;
+  padding: 6px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .training-streak-stars {
-  font-size: 1.15rem;
+  font-size: 1rem;
   letter-spacing: 2px;
 }
 
 .training-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .training-help-btn {
