@@ -107,44 +107,67 @@ export interface SearchOptions {
   initialStepFraction?: number;
 }
 
-/** Coordinate-descent hill-climb: repeatedly nudges one corner at a time
- * in the direction that improves the score, with a shrinking step size.
- * Deterministic and cheap enough to run from several starting guesses. */
 export function searchGridQuad(
   field: GradientField,
   initial: GridQuad,
   options: SearchOptions = {}
 ): { quad: GridQuad; score: number } {
-  const iterations = options.iterations ?? 6;
+  const maxIterations = options.iterations ?? 20;
   const minDim = Math.min(field.width, field.height);
   let step = (options.initialStepFraction ?? 0.08) * minDim;
   let quad: GridQuad = initial.map((p) => ({ ...p })) as GridQuad;
   let score = scoreQuad(field, quad);
 
-  const deltas: [number, number][] = [
-    [step, 0],
-    [-step, 0],
-    [0, step],
-    [0, -step],
+  const directions: [number, number][] = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
   ];
 
-  for (let iter = 0; iter < iterations; iter++) {
+  const tryMove = (candidate: GridQuad): boolean => {
+    const candidateScore = scoreQuad(field, candidate);
+    if (candidateScore > score) {
+      quad = candidate;
+      score = candidateScore;
+      return true;
+    }
+    return false;
+  };
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    let improved = false;
+
+    // Whole-quad translate first: catches an overall position offset even
+    // when no single corner's move alone would yet show an improvement
+    // (moving one corner while the other three remain far off often
+    // doesn't complete any grid line well enough to score better).
+    for (const [ux, uy] of directions) {
+      const dx = ux * step;
+      const dy = uy * step;
+      if (tryMove(quad.map((p) => ({ x: p.x + dx, y: p.y + dy })) as GridQuad)) improved = true;
+    }
+
+    // Per-corner refine.
     for (let cornerIdx = 0; cornerIdx < 4; cornerIdx++) {
-      for (const [dx, dy] of deltas) {
-        const candidate = quad.map((p) => ({ ...p })) as GridQuad;
-        candidate[cornerIdx] = { x: candidate[cornerIdx].x + dx, y: candidate[cornerIdx].y + dy };
-        const candidateScore = scoreQuad(field, candidate);
-        if (candidateScore > score) {
-          quad = candidate;
-          score = candidateScore;
-        }
+      for (const [ux, uy] of directions) {
+        const dx = ux * step;
+        const dy = uy * step;
+        const candidate = quad.map((p, i) =>
+          i === cornerIdx ? { x: p.x + dx, y: p.y + dy } : p
+        ) as GridQuad;
+        if (tryMove(candidate)) improved = true;
       }
     }
-    step *= 0.6;
-    deltas[0][0] = step;
-    deltas[1][0] = -step;
-    deltas[2][1] = step;
-    deltas[3][1] = -step;
+
+    if (!improved) {
+      step *= 0.5;
+      if (step < 0.5) break;
+    }
   }
 
   return { quad, score };
