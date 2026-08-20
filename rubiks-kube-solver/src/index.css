@@ -247,6 +247,13 @@ input[type='range'] {
   text-align: center;
 }
 
+.scan-hint {
+  font-size: 0.9rem;
+  margin: -8px 0 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+
 .scan-photo-area {
   position: relative;
   flex: 1;
@@ -259,6 +266,11 @@ input[type='range'] {
 }
 
 .scan-canvas {
+  /* display:block matters: as an inline element the canvas sits on a text
+     baseline, so its wrapper grows by the line-box descender gap and the
+     grid overlay stretched across that wrapper ends up a few pixels taller
+     than the photo. */
+  display: block;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
