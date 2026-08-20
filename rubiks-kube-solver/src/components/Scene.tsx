@@ -9,6 +9,16 @@ import { RubiksCube } from './RubiksCube';
 interface Props {
   controller: CubeController;
   turnsPerSecond: number;
+  /** Shifts the rendered cube upward by this many pixels. The camera frames
+   * the cube centered in the full-height canvas, but a training/journey HUD
+   * card docked to the bottom covers a large chunk of that height - without
+   * this, the cube sits low with a big empty gap above it and gets covered
+   * below. Purely a CSS transform on the canvas wrapper (not a camera or
+   * raycasting change): the background matches the surrounding page color,
+   * so the space vacated at the bottom reads as seamless, and react-three-
+   * fiber's pointer handling reads the canvas's actual on-screen position
+   * via getBoundingClientRect(), so drag-to-turn keeps working unmodified. */
+  liftPx?: number;
 }
 
 export interface SceneHandle {
@@ -40,7 +50,7 @@ function ResponsiveCamera() {
   return null;
 }
 
-export const Scene = forwardRef<SceneHandle, Props>(function Scene({ controller, turnsPerSecond }, ref) {
+export const Scene = forwardRef<SceneHandle, Props>(function Scene({ controller, turnsPerSecond, liftPx = 0 }, ref) {
   const [orbitEnabled, setOrbitEnabled] = useState(true);
   const orbitControlsRef = useRef<OrbitControlsImpl>(null);
 
@@ -49,19 +59,28 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ controller,
   }));
 
   return (
-    <Canvas shadows camera={{ position: [4.5, 4, 5.5], fov: BASE_VERTICAL_FOV }}>
-      <ResponsiveCamera />
-      <color attach="background" args={['#0b0b10']} />
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[5, 8, 5]} intensity={1.3} castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-6, -3, -4]} intensity={0.25} />
-      <RubiksCube
-        controller={controller}
-        turnsPerSecond={turnsPerSecond}
-        onGrabbingChange={(grabbing) => setOrbitEnabled(!grabbing)}
-      />
-      <ContactShadows position={[0, -1.8, 0]} opacity={0.5} scale={10} blur={2.5} far={4} />
-      <OrbitControls ref={orbitControlsRef} enabled={orbitEnabled} enablePan={false} minDistance={5} maxDistance={14} />
-    </Canvas>
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        transform: liftPx ? `translateY(-${liftPx}px)` : undefined,
+        transition: 'transform 0.3s ease',
+      }}
+    >
+      <Canvas shadows camera={{ position: [4.5, 4, 5.5], fov: BASE_VERTICAL_FOV }}>
+        <ResponsiveCamera />
+        <color attach="background" args={['#0b0b10']} />
+        <ambientLight intensity={0.65} />
+        <directionalLight position={[5, 8, 5]} intensity={1.3} castShadow shadow-mapSize={[1024, 1024]} />
+        <directionalLight position={[-6, -3, -4]} intensity={0.25} />
+        <RubiksCube
+          controller={controller}
+          turnsPerSecond={turnsPerSecond}
+          onGrabbingChange={(grabbing) => setOrbitEnabled(!grabbing)}
+        />
+        <ContactShadows position={[0, -1.8, 0]} opacity={0.5} scale={10} blur={2.5} far={4} />
+        <OrbitControls ref={orbitControlsRef} enabled={orbitEnabled} enablePan={false} minDistance={5} maxDistance={14} />
+      </Canvas>
+    </div>
   );
 });

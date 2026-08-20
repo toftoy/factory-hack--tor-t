@@ -68,11 +68,15 @@ export default function App() {
   }, [training, journey]);
 
   const isSolved = controller.facelets === SOLVED_STATE;
+  // The training/journey HUD docks a card to the bottom of the screen; without
+  // compensating, the camera centers the cube in the full-height canvas and
+  // it ends up mostly hidden behind that card with empty space above it.
+  const hudActive = Boolean(training.track) || journey.active;
 
   return (
     <div className="app">
       <div className="viewport">
-        <Scene ref={sceneRef} controller={controller} turnsPerSecond={speed} />
+        <Scene ref={sceneRef} controller={controller} turnsPerSecond={speed} liftPx={hudActive ? 130 : 0} />
         {training.track && (
           <TrainingWizard training={training} onExit={training.stop} onResetCamera={handleResetCamera} />
         )}
