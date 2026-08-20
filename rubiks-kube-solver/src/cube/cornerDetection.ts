@@ -178,13 +178,31 @@ export interface DetectionResult {
   confidence: number;
 }
 
-// Starting value from this file's own idealized synthetic tests (a clean
-// black-on-white grid scores in the low hundreds; a no-signal image scores
-// ~0). Task 3 recalibrates this against realistic rendered synthetic
-// photos (varied colors/lighting/angles), which have a very different,
-// noisier gradient magnitude distribution than this file's idealized
-// tests - update this constant there and replace this comment with the
-// measured numbers.
+// Measured (Task 3) against 24 procedurally-generated synthetic cube-face
+// photos - all 6 real sticker colors as the dominant face, each crossed
+// with 4 camera-angle levels (straight-on, a 10% keystone tilt, and two
+// 25% steep tilts in opposite directions), each cell independently
+// color-jittered +-15 per channel to simulate real-world lighting/color
+// variation: every case that found a real grid (as opposed to falling
+// back on a blank/no-signal image) scored 88-181, regardless of whether
+// the found quad ended up close to the true corners or not (see below).
+// A blank/no-signal image scores <1 (asserted by this file's own
+// fallback test). 20 stays comfortably below every real-grid score
+// measured and well above the blank baseline, so the original starting
+// value holds up and is kept unchanged.
+//
+// Caveat found during that same measurement, left as-is per Task 3's
+// scope (verification/calibration only, not algorithm changes): under
+// perspective (keystone) distortion, searchGridQuad's hill-climbing search
+// sometimes converges to a plausible-but-inaccurate quad that still scores
+// in the same 88-181 range as an accurate one - straight-on detections
+// landed within ~14-22px of the true corners across all 6 colors, but
+// accuracy degraded with tilt severity (10% tilt: ~21-49px error; 25%
+// tilt: ~22-129px error), independent of confidence. So this threshold
+// only gates "was any grid-like pattern found at all" - it cannot, by
+// itself, distinguish an accurate detection from an inaccurate one at a
+// steep angle. Manual drag-to-correct (ScanGridOverlay's draggable corner
+// handles) is the mitigation for that case, not a higher threshold.
 const CONFIDENCE_THRESHOLD = 20;
 
 function defaultQuad(width: number, height: number, sizeFraction: number): GridQuad {
