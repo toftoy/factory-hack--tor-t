@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CubeScan } from '../hooks/useCubeScan';
-import type { GridBounds } from '../cube/gridSampler';
+import type { GridQuad } from '../cube/gridSampler';
+import { detectGridQuad } from '../cube/cornerDetection';
 import { ScanGridOverlay } from './ScanGridOverlay';
 
 const STEP_TEXT = [
@@ -22,7 +23,7 @@ interface Props {
 export function ScanWizard({ scan, onCancel }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [bounds, setBounds] = useState<GridBounds | null>(null);
+  const [quad, setQuad] = useState<GridQuad | null>(null);
 
   const phase = scan.phase;
   const isCapturingD = phase.kind === 'capturingD';
@@ -35,12 +36,9 @@ export function ScanWizard({ scan, onCancel }: Props) {
     canvas.height = image.naturalHeight;
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
-    const size = Math.min(image.naturalWidth, image.naturalHeight) * 0.7;
-    setBounds({
-      x: (image.naturalWidth - size) / 2,
-      y: (image.naturalHeight - size) / 2,
-      size,
-    });
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { quad: detected } = detectGridQuad(imageData);
+    setQuad(detected);
   }, [image]);
 
   const handleFileChange = useCallback(
@@ -64,15 +62,15 @@ export function ScanWizard({ scan, onCancel }: Props) {
   );
 
   const handleConfirm = useCallback(() => {
-    if (!canvasRef.current || !bounds) return;
+    if (!canvasRef.current || !quad) return;
     const ctx = canvasRef.current.getContext('2d')!;
     if (isCapturingD) {
-      scan.confirmD(ctx, bounds);
+      scan.confirmD(ctx, quad);
     } else {
-      scan.confirmStep(ctx, bounds);
+      scan.confirmStep(ctx, quad);
     }
-    setBounds(null);
-  }, [scan, bounds, isCapturingD]);
+    setQuad(null);
+  }, [scan, quad, isCapturingD]);
 
   if (phase.kind !== 'capturing' && phase.kind !== 'capturingD') return null;
 
@@ -99,10 +97,10 @@ export function ScanWizard({ scan, onCancel }: Props) {
             }}
           >
             <canvas ref={canvasRef} className="scan-canvas" />
-            {bounds && canvasRef.current && (
+            {quad && canvasRef.current && (
               <ScanGridOverlay
-                bounds={bounds}
-                onChange={setBounds}
+                quad={quad}
+                onChange={setQuad}
                 canvasWidth={canvasRef.current.width}
                 canvasHeight={canvasRef.current.height}
               />

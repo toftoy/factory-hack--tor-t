@@ -1,25 +1,29 @@
 import { useCallback, useRef } from 'react';
-import type { GridBounds } from '../cube/gridSampler';
+import type { GridQuad, Point } from '../cube/cornerDetection';
 
 interface Props {
-  bounds: GridBounds;
-  onChange: (bounds: GridBounds) => void;
+  quad: GridQuad;
+  onChange: (quad: GridQuad) => void;
   canvasWidth: number;
   canvasHeight: number;
 }
 
-export function ScanGridOverlay({ bounds, onChange, canvasWidth, canvasHeight }: Props) {
-  const dragRef = useRef<{ mode: 'move' | 'resize'; startX: number; startY: number; start: GridBounds } | null>(
-    null
-  );
+type DragMode = 'move' | 0 | 1 | 2 | 3;
+
+function lerp(a: Point, b: Point, t: number): Point {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+export function ScanGridOverlay({ quad, onChange, canvasWidth, canvasHeight }: Props) {
+  const dragRef = useRef<{ mode: DragMode; startX: number; startY: number; start: GridQuad } | null>(null);
 
   const onPointerDown = useCallback(
-    (mode: 'move' | 'resize') => (event: React.PointerEvent) => {
+    (mode: DragMode) => (event: React.PointerEvent) => {
       event.stopPropagation();
-      dragRef.current = { mode, startX: event.clientX, startY: event.clientY, start: bounds };
+      dragRef.current = { mode, startX: event.clientX, startY: event.clientY, start: quad };
       (event.target as Element).setPointerCapture(event.pointerId);
     },
-    [bounds]
+    [quad]
   );
 
   const onPointerMove = useCallback(
@@ -29,10 +33,12 @@ export function ScanGridOverlay({ bounds, onChange, canvasWidth, canvasHeight }:
       const dx = event.clientX - drag.startX;
       const dy = event.clientY - drag.startY;
       if (drag.mode === 'move') {
-        onChange({ ...drag.start, x: drag.start.x + dx, y: drag.start.y + dy });
+        onChange(drag.start.map((p) => ({ x: p.x + dx, y: p.y + dy })) as GridQuad);
       } else {
-        const size = Math.max(30, drag.start.size + (dx + dy) / 2);
-        onChange({ ...drag.start, size });
+        const cornerIdx = drag.mode;
+        onChange(
+          drag.start.map((p, i) => (i === cornerIdx ? { x: p.x + dx, y: p.y + dy } : p)) as GridQuad
+        );
       }
     },
     [onChange]
@@ -42,11 +48,19 @@ export function ScanGridOverlay({ bounds, onChange, canvasWidth, canvasHeight }:
     dragRef.current = null;
   }, []);
 
-  const cell = bounds.size / 3;
-  const lines = [1, 2].flatMap((i) => [
-    <line key={`v${i}`} x1={bounds.x + cell * i} y1={bounds.y} x2={bounds.x + cell * i} y2={bounds.y + bounds.size} />,
-    <line key={`h${i}`} x1={bounds.x} y1={bounds.y + cell * i} x2={bounds.x + bounds.size} y2={bounds.y + cell * i} />,
-  ]);
+  const [tl, tr, br, bl] = quad;
+  const quadPoint = (u: number, v: number) => lerp(lerp(tl, tr, u), lerp(bl, br, u), v);
+  const outline = `${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`;
+  const internalLines = [1 / 3, 2 / 3].flatMap((t) => {
+    const vTop = quadPoint(t, 0);
+    const vBottom = quadPoint(t, 1);
+    const hLeft = quadPoint(0, t);
+    const hRight = quadPoint(1, t);
+    return [
+      <line key={`v${t}`} x1={vTop.x} y1={vTop.y} x2={vBottom.x} y2={vBottom.y} />,
+      <line key={`h${t}`} x1={hLeft.x} y1={hLeft.y} x2={hRight.x} y2={hRight.y} />,
+    ];
+  });
 
   return (
     <svg
@@ -55,29 +69,32 @@ export function ScanGridOverlay({ bounds, onChange, canvasWidth, canvasHeight }:
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <rect
-        x={bounds.x}
-        y={bounds.y}
-        width={bounds.size}
-        height={bounds.size}
+      <polygon
+        points={outline}
         fill="transparent"
         stroke="#4f7cff"
-        strokeWidth={2}
+        strokeWidth={3}
         onPointerDown={onPointerDown('move')}
         style={{ cursor: 'move' }}
       />
-      <g stroke="#4f7cff" strokeWidth={1} opacity={0.7}>
-        {lines}
+      <g stroke="#4f7cff" strokeWidth={1.5} opacity={0.8}>
+        {internalLines}
       </g>
-      <rect
-        x={bounds.x + bounds.size - 14}
-        y={bounds.y + bounds.size - 14}
-        width={14}
-        height={14}
-        fill="#4f7cff"
-        onPointerDown={onPointerDown('resize')}
-        style={{ cursor: 'nwse-resize' }}
-      />
+      <g>
+        {quad.map((corner, i) => (
+          <circle
+            key={i}
+            cx={corner.x}
+            cy={corner.y}
+            r={16}
+            fill="#4f7cff"
+            stroke="white"
+            strokeWidth={3}
+            onPointerDown={onPointerDown(i as 0 | 1 | 2 | 3)}
+            style={{ cursor: 'grab' }}
+          />
+        ))}
+      </g>
     </svg>
   );
 }
