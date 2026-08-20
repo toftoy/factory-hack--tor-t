@@ -67,11 +67,22 @@ function bilinearSample(field: GradientField, x: number, y: number): number {
 const LINE_SAMPLES = 20;
 
 function sampleLineEnergy(field: GradientField, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const offsets = [-2, -1, 0, 1, 2];
   let total = 0;
   for (let i = 0; i < LINE_SAMPLES; i++) {
     const t = (i + 0.5) / LINE_SAMPLES;
     const p = lerpPoint(a, b, t);
-    total += bilinearSample(field, p.x, p.y);
+    let maxAtPoint = 0;
+    for (const o of offsets) {
+      const sample = bilinearSample(field, p.x + nx * o, p.y + ny * o);
+      if (sample > maxAtPoint) maxAtPoint = sample;
+    }
+    total += maxAtPoint;
   }
   return total / LINE_SAMPLES;
 }
