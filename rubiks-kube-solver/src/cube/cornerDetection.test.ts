@@ -8,16 +8,24 @@ import {
   type Point,
 } from './cornerDetection';
 
-/** Renders a white background with a black cube-grid outline plus its two
- * internal vertical/horizontal lines along the given quad, simulating the
+/** Renders a black cube-grid outline plus its two internal
+ * vertical/horizontal lines along the given quad, over a solid background
+ * of the given fill color (white by default), simulating the
  * high-contrast pattern a real cube face produces. Built by direct pixel
  * painting (no canvas), so it runs in plain Node. */
 function buildSyntheticImage(
   width: number,
   height: number,
-  quad: GridQuad
+  quad: GridQuad,
+  fill: { r: number; g: number; b: number } = { r: 255, g: 255, b: 255 }
 ): { width: number; height: number; data: Uint8ClampedArray } {
-  const data = new Uint8ClampedArray(width * height * 4).fill(255);
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    data[i * 4] = fill.r;
+    data[i * 4 + 1] = fill.g;
+    data[i * 4 + 2] = fill.b;
+    data[i * 4 + 3] = 255;
+  }
   const setPixel = (x: number, y: number) => {
     const xi = Math.round(x);
     const yi = Math.round(y);
@@ -116,6 +124,33 @@ describe('scoreQuad', () => {
     expect(correctScore).toBeGreaterThan(150);
   });
 
+  test('scores a grid over vividly-colored plastic higher than an identical grid over a desaturated background', () => {
+    // Reproduces a failure found on real photos: a shadow or table edge
+    // just past the cube's true boundary is sometimes a stronger
+    // brightness edge than the real sticker-to-sticker grid line, so a
+    // quad that overshoots onto it can out-score the correctly-bounded
+    // one. Line-energy alone can't tell the two apart by *where* the
+    // lines are, but real cube plastic is always either vividly
+    // saturated or bright white, while a shadow/table strip is neither -
+    // this checks that signal in isolation, holding line contrast fixed
+    // so only interior colorfulness differs. (60,180,60) and (130,130,130)
+    // are deliberately chosen to produce nearly the same luminance -
+    // confirmed the line-vs-background contrast, and so the line-energy
+    // term alone, barely differs between them (132.69 vs 132.24) - so any
+    // larger gap is the new colorfulness term, not a contrast artifact.
+    const quad: GridQuad = [
+      { x: 40, y: 40 },
+      { x: 260, y: 40 },
+      { x: 260, y: 260 },
+      { x: 40, y: 260 },
+    ];
+    const vividImage = buildSyntheticImage(300, 300, quad, { r: 60, g: 180, b: 60 });
+    const desaturatedImage = buildSyntheticImage(300, 300, quad, { r: 130, g: 130, b: 130 });
+    const vividScore = scoreQuad(computeGradientField(vividImage), quad);
+    const desaturatedScore = scoreQuad(computeGradientField(desaturatedImage), quad);
+    expect(vividScore).toBeGreaterThan(desaturatedScore * 1.2);
+  });
+
   test('scores a skewed (non-rectangular) quad correctly, proving perspective handling', () => {
     const skewedQuad: GridQuad = [
       { x: 60, y: 30 },
@@ -162,6 +197,25 @@ describe('scoreQuad', () => {
       { x: 349, y: height },
     ];
     expect(scoreQuad(field, degenerateQuad)).toBeLessThan(1);
+  });
+
+  test('rejects a quad with wildly mismatched side lengths, even with a substantial area', () => {
+    // Reproduces a third failure found on real photos, after guarding
+    // against tiny area and non-convexity: on the hardest photo, adding
+    // the colorfulness signal (below) shifted the winning local optimum
+    // to a lopsided kite shape - convex, 29% of the frame, but with one
+    // side (27px) 13x shorter than its longest (358px). A real cube face
+    // photographed from any realistic angle never projects to a shape
+    // this lopsided. Quad taken directly from that real failure.
+    const lopsidedQuad: GridQuad = [
+      { x: 146, y: 9 },
+      { x: 432, y: 225 },
+      { x: 432, y: 252 },
+      { x: 162, y: 360 },
+    ];
+    const image = buildSyntheticImage(450, 400, lopsidedQuad);
+    const field = computeGradientField(image);
+    expect(scoreQuad(field, lopsidedQuad)).toBe(0);
   });
 
   test('rejects a concave (non-convex) quad even when its area is large', () => {

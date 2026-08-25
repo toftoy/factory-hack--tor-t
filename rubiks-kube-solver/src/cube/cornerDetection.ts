@@ -10,6 +10,10 @@ export interface GradientField {
   width: number;
   height: number;
   data: Float32Array;
+  /** Per-pixel "looks like cube plastic" score in [0, 1] - see
+   * pixelColorfulness. Used to keep the search from preferring a quad
+   * whose interior bleeds onto desaturated background (table, shadow). */
+  colorfulness: Float32Array;
 }
 
 interface ImageLike {
@@ -18,12 +22,39 @@ interface ImageLike {
   data: Uint8ClampedArray | number[];
 }
 
+// Real cube stickers are always either vividly saturated plastic or
+// bright white plastic - never a desaturated, medium-brightness tone
+// like wood or shadow. These thresholds mirror colorClassifier's own
+// white-saturation cutoff (0.25) but are a bit more permissive (0.2/0.6)
+// since this only needs to rule out backgrounds, not classify colors.
+const VIVID_SATURATION_THRESHOLD = 0.2;
+const BRIGHT_VALUE_THRESHOLD = 0.6;
+// HSV saturation is (max-min)/max, which is unstable for dark pixels: a
+// dim brownish shadow like (40,30,20) computes s=0.5 - well past the
+// vivid threshold - purely from a small denominator, not real color.
+// Requiring a minimum brightness alongside saturation rules that out
+// without needing a second, separate dark-pixel case.
+const MIN_VIVID_VALUE = 0.25;
+
+/** 1 if this pixel looks like cube plastic (vividly saturated, or bright
+ * and not obviously tinted), 0 otherwise. */
+function pixelColorfulness(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b) / 255;
+  const min = Math.min(r, g, b) / 255;
+  const saturation = max === 0 ? 0 : (max - min) / max;
+  if (saturation >= VIVID_SATURATION_THRESHOLD && max >= MIN_VIVID_VALUE) return 1;
+  if (max >= BRIGHT_VALUE_THRESHOLD) return 1;
+  return 0;
+}
+
 export function computeGradientField(image: ImageLike): GradientField {
   const { width, height, data } = image;
   const lum = new Float32Array(width * height);
+  const colorfulness = new Float32Array(width * height);
   for (let i = 0; i < width * height; i++) {
     const o = i * 4;
     lum[i] = 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+    colorfulness[i] = pixelColorfulness(data[o], data[o + 1], data[o + 2]);
   }
   const grad = new Float32Array(width * height);
   for (let y = 1; y < height - 1; y++) {
@@ -34,7 +65,7 @@ export function computeGradientField(image: ImageLike): GradientField {
       grad[i] = Math.sqrt(gx * gx + gy * gy);
     }
   }
-  return { width, height, data: grad };
+  return { width, height, data: grad, colorfulness };
 }
 
 function lerpPoint(a: Point, b: Point, t: number): Point {
@@ -48,8 +79,7 @@ function quadPoint(quad: GridQuad, u: number, v: number): Point {
   return lerpPoint(top, bottom, v);
 }
 
-function bilinearSample(field: GradientField, x: number, y: number): number {
-  const { width, height, data } = field;
+function bilinearSampleArray(width: number, height: number, data: Float32Array, x: number, y: number): number {
   if (x < 0 || y < 0 || x >= width - 1 || y >= height - 1) return 0;
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
@@ -64,6 +94,27 @@ function bilinearSample(field: GradientField, x: number, y: number): number {
   return top * (1 - fy) + bottom * fy;
 }
 
+function bilinearSample(field: GradientField, x: number, y: number): number {
+  return bilinearSampleArray(field.width, field.height, field.data, x, y);
+}
+
+/** Average "looks like cube plastic" reading across the quad's interior
+ * (the 9 cell centers), in [0, 1]. Low when part of the quad has bled
+ * onto desaturated background (table, shadow) rather than sticker
+ * plastic. */
+function interiorColorfulness(field: GradientField, quad: GridQuad): number {
+  let total = 0;
+  let count = 0;
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const p = quadPoint(quad, (col + 0.5) / 3, (row + 0.5) / 3);
+      total += bilinearSampleArray(field.width, field.height, field.colorfulness, p.x, p.y);
+      count++;
+    }
+  }
+  return total / count;
+}
+
 const LINE_SAMPLES = 20;
 
 function quadArea(quad: GridQuad): number {
@@ -74,6 +125,29 @@ function quadArea(quad: GridQuad): number {
     area += a.x * b.y - b.x * a.y;
   }
   return Math.abs(area) / 2;
+}
+
+// A real cube face photographed from any realistic angle projects to a
+// quadrilateral whose 4 sides are all roughly comparable in length - even
+// a steep tilt stretches one pair of opposite sides relative to the
+// other, but never makes one side this many times shorter than another.
+// Measured on a real failure: a convex, 29%-of-frame "kite" the search
+// settled into (after the colorfulness signal shifted which local
+// optimum won) had a 27px side next to a 358px one - ratio 13.3. 5 sits
+// comfortably above the ~1.05-2.85 ratios the legitimate skewed-quad
+// tests in this file exercise, and well below that failure's 13.3.
+const MAX_SIDE_LENGTH_RATIO = 5;
+
+function sideLengths(quad: GridQuad): number[] {
+  return quad.map((p, i) => {
+    const next = quad[(i + 1) % 4];
+    return Math.hypot(next.x - p.x, next.y - p.y);
+  });
+}
+
+function hasReasonableSideRatio(quad: GridQuad): boolean {
+  const sides = sideLengths(quad);
+  return Math.max(...sides) <= MAX_SIDE_LENGTH_RATIO * Math.min(...sides);
 }
 
 /** A photograph of a real (planar, rigid) square from any camera angle
@@ -143,6 +217,7 @@ function sampleLineEnergy(field: GradientField, a: Point, b: Point): number {
  * shrunken quad whose internal lines still land on *some* edges. */
 export function scoreQuad(field: GradientField, quad: GridQuad): number {
   if (!isConvex(quad)) return 0;
+  if (!hasReasonableSideRatio(quad)) return 0;
   if (quadArea(quad) < MIN_AREA_FRACTION * field.width * field.height) return 0;
 
   const [tl, tr, br, bl] = quad;
@@ -158,7 +233,18 @@ export function scoreQuad(field: GradientField, quad: GridQuad): number {
   ];
   let total = 0;
   for (const [a, b] of lines) total += sampleLineEnergy(field, a, b);
-  return total / lines.length;
+  const lineEnergy = total / lines.length;
+
+  // A quad whose interior has bled onto desaturated background (table,
+  // shadow) is penalized even when its edges sit on strong lines - a real
+  // cube face's interior is always either vividly colored or bright white
+  // plastic. COLORFULNESS_FLOOR keeps this from ever fully zeroing a
+  // score: real photos have anti-aliased/blurry sticker edges, so a few
+  // of the 9 interior samples landing on a transitional pixel shouldn't
+  // tank an otherwise-correct detection.
+  const COLORFULNESS_FLOOR = 0.4;
+  const colorfulnessFactor = COLORFULNESS_FLOOR + (1 - COLORFULNESS_FLOOR) * interiorColorfulness(field, quad);
+  return lineEnergy * colorfulnessFactor;
 }
 
 export interface SearchOptions {
