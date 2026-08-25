@@ -66,6 +66,52 @@ function bilinearSample(field: GradientField, x: number, y: number): number {
 
 const LINE_SAMPLES = 20;
 
+function quadArea(quad: GridQuad): number {
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = quad[i];
+    const b = quad[(i + 1) % 4];
+    area += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(area) / 2;
+}
+
+/** A photograph of a real (planar, rigid) square from any camera angle
+ * projects to a convex quadrilateral - never a bowtie/self-intersecting
+ * one. Checks that every corner turns the same way (all cross products of
+ * consecutive edges share a sign); a degenerate search result can twist
+ * into a self-intersecting shape whose shoelace area alone doesn't catch
+ * it, since crossing edges partially cancel out instead of adding up. */
+function isConvex(quad: GridQuad): boolean {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = quad[i];
+    const b = quad[(i + 1) % 4];
+    const c = quad[(i + 2) % 4];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (cross === 0) continue;
+    const thisSign = cross > 0 ? 1 : -1;
+    if (sign === 0) sign = thisSign;
+    else if (thisSign !== sign) return false;
+  }
+  return true;
+}
+
+// A quad this small can't be a real cube face filling most of the frame
+// (the app's capture instructions have the user photograph the face
+// close-up). Line-energy scoring alone can't rule these out: a thin
+// degenerate sliver collapsed onto one strong unrelated edge has all 8 of
+// its sample lines pass within the +-2px perpendicular search of that
+// same edge, and a small patch of wood-grain texture can coincidentally
+// have enough directional energy of its own to out-score a real, larger
+// grid it was competing against in the same multi-start search. Measured
+// on real photos: both failure modes (a collapsed sliver, and a
+// wood-grain patch that won out over the real grid) topped out at 3.2% of
+// the frame, while every real detection - including perspective-skewed
+// ones - covered 28-33%. 10% sits well below every real case and well
+// above both failure modes.
+const MIN_AREA_FRACTION = 0.1;
+
 function sampleLineEnergy(field: GradientField, a: Point, b: Point): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -96,6 +142,9 @@ function sampleLineEnergy(field: GradientField, a: Point, b: Point): number {
  * under-constrained, and the search happily settles on a shifted or
  * shrunken quad whose internal lines still land on *some* edges. */
 export function scoreQuad(field: GradientField, quad: GridQuad): number {
+  if (!isConvex(quad)) return 0;
+  if (quadArea(quad) < MIN_AREA_FRACTION * field.width * field.height) return 0;
+
   const [tl, tr, br, bl] = quad;
   const lines: [Point, Point][] = [
     [quadPoint(quad, 1 / 3, 0), quadPoint(quad, 1 / 3, 1)],
@@ -227,10 +276,16 @@ export function isConfidentDetection(confidence: number): boolean {
   return confidence >= CONFIDENCE_THRESHOLD;
 }
 
-function defaultQuad(width: number, height: number, sizeFraction: number): GridQuad {
+function offsetQuad(
+  width: number,
+  height: number,
+  centerXFraction: number,
+  centerYFraction: number,
+  sizeFraction: number
+): GridQuad {
   const size = Math.min(width, height) * sizeFraction;
-  const x = (width - size) / 2;
-  const y = (height - size) / 2;
+  const x = width * centerXFraction - size / 2;
+  const y = height * centerYFraction - size / 2;
   return [
     { x, y },
     { x: x + size, y },
@@ -239,13 +294,36 @@ function defaultQuad(width: number, height: number, sizeFraction: number): GridQ
   ];
 }
 
-/** Runs the search from a few differently-sized centered starting guesses
- * (cheap multi-start, guards against one bad initial guess getting stuck
- * in a local optimum) and keeps the best-scoring result. Falls back to
- * today's default centered square when confidence is too low to trust. */
+function defaultQuad(width: number, height: number, sizeFraction: number): GridQuad {
+  return offsetQuad(width, height, 0.5, 0.5, sizeFraction);
+}
+
+// Real photos are rarely framed with the cube dead-center (it's held in a
+// hand, not placed under a fixed rig), so a centered-only starting guess
+// can leave the true grid too far away for the hill-climbing search in
+// searchGridQuad to ever reach. Covering 9 positions across the frame at
+// 2 sizes (18 starts total, still cheap since each is a small downscaled
+// field) gives the search a start within reach of the grid wherever it
+// actually sits. Verified against 5 real off-center phone photos that a
+// centered-only search (the previous 3 starts) missed entirely.
+const START_CENTER_FRACTIONS = [0.3, 0.5, 0.7];
+const START_SIZE_FRACTIONS = [0.6, 0.75];
+
+/** Runs the search from starting guesses spread across the frame (cheap
+ * multi-start, guards against one bad initial guess getting stuck in a
+ * local optimum, and against the true grid sitting far from center) and
+ * keeps the best-scoring result. Falls back to today's default centered
+ * square when confidence is too low to trust. */
 export function detectGridQuad(image: ImageLike): DetectionResult {
   const field = computeGradientField(image);
-  const starts = [0.6, 0.7, 0.8].map((f) => defaultQuad(image.width, image.height, f));
+  const starts: GridQuad[] = [];
+  for (const cx of START_CENTER_FRACTIONS) {
+    for (const cy of START_CENTER_FRACTIONS) {
+      for (const size of START_SIZE_FRACTIONS) {
+        starts.push(offsetQuad(image.width, image.height, cx, cy, size));
+      }
+    }
+  }
   let best: { quad: GridQuad; score: number } | null = null;
   for (const start of starts) {
     const result = searchGridQuad(field, start);

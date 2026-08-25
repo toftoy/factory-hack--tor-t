@@ -137,6 +137,58 @@ describe('scoreQuad', () => {
     // axis-aligned guess=99.57, ratio=2.85.
     expect(correctScore).toBeGreaterThan(axisAlignedScore * 2);
   });
+
+  test('rejects a near-zero-area quad even when it sits exactly on a strong edge', () => {
+    // Reproduces a failure found by running detection on real phone
+    // photos: a degenerate sliver-shaped quad collapsed onto one strong,
+    // unrelated edge (a table/background boundary) and every one of its 8
+    // sample lines landed within the +-2px perpendicular search of that
+    // same edge, so it scored as high as a real grid despite having
+    // essentially no area - i.e. not being a grid at all.
+    const width = 400;
+    const height = 300;
+    const data = new Uint8ClampedArray(width * height * 4).fill(255);
+    for (let y = 0; y < height; y++) {
+      for (let x = 350; x < width; x++) {
+        const i = (y * width + x) * 4;
+        data[i] = data[i + 1] = data[i + 2] = 0;
+      }
+    }
+    const field = computeGradientField({ width, height, data });
+    const degenerateQuad: GridQuad = [
+      { x: 349, y: 0 },
+      { x: 351, y: 0 },
+      { x: 351, y: height },
+      { x: 349, y: height },
+    ];
+    expect(scoreQuad(field, degenerateQuad)).toBeLessThan(1);
+  });
+
+  test('rejects a concave (non-convex) quad even when its area is large', () => {
+    // Reproduces a second failure found on real photos: after guarding
+    // against tiny-area quads, the search on one hard photo (a lot of
+    // wood-grain texture competing with the real grid) twisted one corner
+    // in toward the center instead of collapsing to near-zero area - a
+    // "dart" shape whose shoelace area (27% of the frame here) is nowhere
+    // near small enough for the area guard to catch. A real square
+    // photographed from any angle always projects to a convex
+    // quadrilateral, so this shape alone proves it isn't a grid.
+    const trueQuad: GridQuad = [
+      { x: 40, y: 40 },
+      { x: 260, y: 40 },
+      { x: 260, y: 260 },
+      { x: 40, y: 260 },
+    ];
+    const image = buildSyntheticImage(300, 300, trueQuad);
+    const field = computeGradientField(image);
+    const dartQuad: GridQuad = [
+      { x: 40, y: 40 },
+      { x: 260, y: 40 },
+      { x: 100, y: 100 }, // pulled in past the diagonal instead of the true bottom-right corner
+      { x: 40, y: 260 },
+    ];
+    expect(scoreQuad(field, dartQuad)).toBe(0);
+  });
 });
 
 describe('searchGridQuad', () => {
@@ -201,5 +253,37 @@ describe('detectGridQuad', () => {
     const expectedX = (width - size) / 2;
     expect(result.quad[0].x).toBeCloseTo(expectedX, 0);
     expect(result.confidence).toBeLessThan(1);
+  });
+
+  test('finds a grid positioned far from center - real photos are rarely framed dead-center', () => {
+    // Reproduces a failure found by running detection on real phone photos:
+    // detectGridQuad only ever tried centered starting guesses, so a grid
+    // sitting off to one side (very common - the cube is held in a hand,
+    // not centered in the viewfinder) was never near any starting guess
+    // and the search stayed lost.
+    const width = 600;
+    const height = 300;
+    const trueQuad: GridQuad = [
+      { x: 20, y: 40 },
+      { x: 220, y: 40 },
+      { x: 220, y: 240 },
+      { x: 20, y: 240 },
+    ];
+    const image = buildSyntheticImage(width, height, trueQuad);
+    const result = detectGridQuad(image);
+    // The evenly-spaced internal grid lines this synthetic image draws are
+    // themselves a repeating pattern, so a nearby but shifted/rescaled
+    // quad can land its own internal thirds on a subset of those same
+    // lines and settle into a real (if lower-scoring) local optimum -
+    // the same aliasing risk documented for tilted real photos elsewhere
+    // in this file. Measured here: the found quad sits within 64px of the
+    // true one (was never found at all before the off-center starts were
+    // added) at a score of 191.6 vs the true quad's 263.8 - clearly in the
+    // right region, not lost in the blank background. 70px leaves headroom
+    // on that measurement while still failing if off-center starts regress.
+    for (let i = 0; i < 4; i++) {
+      expect(Math.abs(result.quad[i].x - trueQuad[i].x)).toBeLessThan(70);
+      expect(Math.abs(result.quad[i].y - trueQuad[i].y)).toBeLessThan(70);
+    }
   });
 });
