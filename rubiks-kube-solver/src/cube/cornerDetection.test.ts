@@ -118,3 +118,138 @@ describe('CONFIDENCE_THRESHOLD', () => {
     expect(CONFIDENCE_THRESHOLD).toBeGreaterThan(0.33);
   });
 });
+
+/** Same line-drawing approach as buildSyntheticGridImage, but over a
+ * wood-grain-like striped background instead of solid white, with an
+ * optional dark shadow band drawn just past the quad's true bottom edge -
+ * reproducing the exact failure class (off-center cube, textured
+ * background, a shadow stronger than the real boundary) that defeated the
+ * previous hand-rolled algorithm across four iteration rounds. */
+function buildClutteredGridImage(
+  width: number,
+  height: number,
+  quad: GridQuad,
+  options: { shadow: boolean }
+): ImageData {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const stripe = Math.sin(y * 0.4) * 15 + Math.sin((x + y) * 0.05) * 8;
+      data[i] = 190 + stripe;
+      data[i + 1] = 150 + stripe * 0.8;
+      data[i + 2] = 110 + stripe * 0.6;
+      data[i + 3] = 255;
+    }
+  }
+  const setPixel = (x: number, y: number) => {
+    const xi = Math.round(x);
+    const yi = Math.round(y);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const px = xi + dx;
+        const py = yi + dy;
+        if (px < 0 || py < 0 || px >= width || py >= height) continue;
+        const i = (py * width + px) * 4;
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+      }
+    }
+  };
+  const lerp = (a: Point, b: Point, t: number): Point => ({
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  });
+  const drawLine = (a: Point, b: Point) => {
+    for (let i = 0; i <= 200; i++) {
+      const p = lerp(a, b, i / 200);
+      setPixel(p.x, p.y);
+    }
+  };
+  const [tl, tr, br, bl] = quad;
+  drawLine(tl, tr);
+  drawLine(tr, br);
+  drawLine(br, bl);
+  drawLine(bl, tl);
+  const quadPoint = (u: number, v: number): Point => {
+    const top = lerp(tl, tr, u);
+    const bottom = lerp(bl, br, u);
+    return lerp(top, bottom, v);
+  };
+  drawLine(quadPoint(1 / 3, 0), quadPoint(1 / 3, 1));
+  drawLine(quadPoint(2 / 3, 0), quadPoint(2 / 3, 1));
+  drawLine(quadPoint(0, 1 / 3), quadPoint(1, 1 / 3));
+  drawLine(quadPoint(0, 2 / 3), quadPoint(1, 2 / 3));
+
+  if (options.shadow) {
+    const shadowY = Math.round((bl.y + br.y) / 2) + 20;
+    for (let y = Math.max(0, shadowY - 10); y < Math.min(height, shadowY + 10); y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        data[i] *= 0.55;
+        data[i + 1] *= 0.55;
+        data[i + 2] *= 0.55;
+      }
+    }
+  }
+  return new ImageData(data, width, height);
+}
+
+describe('detectGridQuad - cube-tuned robustness (regression corpus)', () => {
+  test('finds an off-center grid over a textured background with a shadow past its true edge', async () => {
+    const width = 600;
+    const height = 400;
+    // Off-center: cube in the left half, open textured background to the
+    // right - the exact framing that made the old algorithm latch onto
+    // background clutter.
+    const trueQuad: GridQuad = [
+      { x: 40, y: 60 },
+      { x: 260, y: 60 },
+      { x: 260, y: 280 },
+      { x: 40, y: 280 },
+    ];
+    const image = buildClutteredGridImage(width, height, trueQuad, { shadow: true });
+    const result = await detectGridQuad(image);
+    // Measured directly during planning: confidence 0.767, corner error
+    // 1.4px on all four corners. 15px/0.6 leave real headroom.
+    for (let i = 0; i < 4; i++) {
+      expect(Math.abs(result.quad[i].x - trueQuad[i].x)).toBeLessThan(15);
+      expect(Math.abs(result.quad[i].y - trueQuad[i].y)).toBeLessThan(15);
+    }
+    expect(result.confidence).toBeGreaterThan(0.6);
+    expect(isConfidentDetection(result.confidence)).toBe(true);
+  });
+
+  test('does not confidently report a grid on cluttered background with no cube present', async () => {
+    const width = 600;
+    const height = 400;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const stripe = Math.sin(y * 0.4) * 15 + Math.sin((x + y) * 0.05) * 8;
+        data[i] = 190 + stripe;
+        data[i + 1] = 150 + stripe * 0.8;
+        data[i + 2] = 110 + stripe * 0.6;
+        data[i + 3] = 255;
+      }
+    }
+    const shadowY = 260;
+    for (let y = shadowY - 10; y < shadowY + 10; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        data[i] *= 0.55;
+        data[i + 1] *= 0.55;
+        data[i + 2] *= 0.55;
+      }
+    }
+    const image = new ImageData(data, width, height);
+    const result = await detectGridQuad(image);
+    // Measured directly during planning: confidence 0.191 on this exact
+    // scene (the shadow band itself gets picked up as a thin candidate
+    // contour) - comfortably under CONFIDENCE_THRESHOLD (0.5) and nowhere
+    // near the 0.33 ceiling a *valid* geometry could reach.
+    expect(isConfidentDetection(result.confidence)).toBe(false);
+  });
+});
