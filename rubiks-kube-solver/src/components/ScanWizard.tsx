@@ -4,17 +4,6 @@ import type { GridQuad } from '../cube/gridSampler';
 import { detectGridQuad, isConfidentDetection } from '../cube/cornerDetection';
 import { ScanGridOverlay } from './ScanGridOverlay';
 
-/** Corner detection runs on a downscaled copy of the photo. The
- * algorithm's internal constants (line sample count, perpendicular
- * search offsets) are absolute pixel values that were tuned and verified
- * at roughly this scale, and running the gradient computation plus the
- * hill-climbing search on a full 12+ megapixel phone photo would also
- * stall the main thread for hundreds of milliseconds (much worse on
- * older phones) right after the camera returns. The detected quad is
- * scaled back up to full-resolution coordinates afterwards; colour
- * sampling still runs on the full-resolution canvas. */
-const DETECTION_WORKING_SIZE = 600;
-
 const STEP_TEXT = [
   'Legg kuben på bordet med hvit side opp. Ta bilde av siden som ser på deg.',
   'Snu en gang til høyre. Ta bilde.',
@@ -49,24 +38,17 @@ export function ScanWizard({ scan, onCancel }: Props) {
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
 
-    const scale = Math.min(1, DETECTION_WORKING_SIZE / Math.max(canvas.width, canvas.height));
-    const workWidth = Math.max(1, Math.round(canvas.width * scale));
-    const workHeight = Math.max(1, Math.round(canvas.height * scale));
-    const workCanvas = document.createElement('canvas');
-    workCanvas.width = workWidth;
-    workCanvas.height = workHeight;
-    const workCtx = workCanvas.getContext('2d')!;
-    workCtx.drawImage(image, 0, 0, workWidth, workHeight);
-    const workImageData = workCtx.getImageData(0, 0, workWidth, workHeight);
-
-    const { quad: detectedSmall, confidence: detectedConfidence } = detectGridQuad(workImageData);
-    // Back up into full-resolution image coordinates - the overlay's
-    // viewBox and sampleGridColors both work in that space.
-    const scaleX = workWidth / canvas.width;
-    const scaleY = workHeight / canvas.height;
-    const detected = detectedSmall.map((p) => ({ x: p.x / scaleX, y: p.y / scaleY })) as GridQuad;
-    setQuad(detected);
-    setConfidence(detectedConfidence);
+    // scanic downscales internally and returns corners already in this
+    // canvas's coordinate space - no manual downscale-and-scale-back needed.
+    let ignore = false;
+    detectGridQuad(canvas).then(({ quad, confidence }) => {
+      if (ignore) return;
+      setQuad(quad);
+      setConfidence(confidence);
+    });
+    return () => {
+      ignore = true;
+    };
   }, [image]);
 
   const handleFileChange = useCallback(
