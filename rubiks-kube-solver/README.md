@@ -20,11 +20,36 @@ two-phase-algoritme, med animerte trekk i 3D.
 - **Skann en ekte kube**: fotografer en fysisk, blandet kube (5 bilder,
   kuben løftes aldri) og få tilstanden lastet inn direkte — se
   `docs/superpowers/specs/2026-08-17-camera-scanning-design.md` for
-  hvordan bunnen og toppens retning regnes ut fra bare 5 bilder.
+  hvordan bunnen og toppens retning regnes ut fra bare 5 bilder. Rutenettet
+  som skal leses av finner appen automatisk (klassisk konturbasert
+  dokumentgjenkjenning via [scanic](https://www.npmjs.com/package/scanic),
+  ikke ML) rett etter at bildet er tatt; ved lav treffsikkerhet faller den
+  tilbake på et sentrert forslag. De fire hjørnehåndtakene i overlayet kan
+  alltid dras enkeltvis for å rette opp perspektivet manuelt, uansett om
+  automatikken traff eller ikke — se
+  `docs/superpowers/specs/2026-08-25-scanic-grid-detection-rewrite-design.md`.
 - **Tren på algoritmer**: øv på navngitte kube-algoritmer (nybegynnermetode
   eller 2-look OLL/PLL) direkte på 3D-kuben — appen setter opp et kjent
   case, du løser det selv ved å dra i lag, og appen tar tid og styrer
-  fremgang med et 3-på-rad-krav for å låse opp neste algoritme.
+  fremgang med et 3-på-rad-krav for å låse opp neste algoritme. Et eget
+  notasjons-spor ("Tren: Notasjon") lærer bort hva bokstaver og symboler
+  betyr — ti case som dekker alle seks sidene og alle modifikatorene
+  (f.eks. U, U', U2) — og må fullføres én gang før nybegynner- eller
+  2-look-sporet blir tilgjengelig. Det forblir tilgjengelig for gjenbesøk
+  etterpå, med en egen nullstill-knapp for å starte et spor helt på nytt.
+- **Lær å løse kuben** ("🧩 Lær å løse kuben"): den nye primærknappen og
+  appens standard inngangspunkt — en styrt reise gjennom hele
+  nybegynnermetoden i 7 steg (kors, hjørner, mellomlag, kors på toppen, vend
+  hjørner, plasser hjørner, plasser kanter), bygget oppå samme
+  case-for-case-motor som algoritmetreningen over, men med ett-gangs
+  fremgang per case i stedet for et 3-på-rad-krav. Krever, akkurat som de
+  andre sporene, at notasjonssporet er fullført først — trykker du på
+  knappen før det er gjort, starter den notasjonsleksjonen i stedet. Når
+  alle 7 stegene er unnagjort vises en egen feiringsskjerm ("Du løste
+  kuben fra bunnen av!"). Bland/løs/skann og de navngitte
+  algoritme-treningssporene er fortsatt tilgjengelige, nå samlet bak en
+  "▸ Verktøy for viderekomne"-seksjon i panelet for de som allerede
+  kjenner metoden.
 
 ## Kom i gang
 
@@ -69,16 +94,42 @@ npm run preview        # server produksjonsbygget lokalt
   `scanAssembly.ts`, `scanValidation.ts` – ren logikk for å skanne en ekte
   kube fra 5 (eller unntaksvis 6) bilder: fargeklassifisering av rutene,
   utledning av bunnens/toppens retning, sammenstilling til en full
-  facelet-streng og gyldighetssjekk (paritet). `src/hooks/useCubeScan.ts` er
-  tilstandsmaskinen for skanne-veiviseren; `src/components/ScanWizard.tsx`,
-  `ScanGridOverlay.tsx` og `ScanReview.tsx` er UI-et for fotografering,
-  det justerbare rutenett-overlayet og manuell retting før tilstanden tas i bruk
+  facelet-streng og gyldighetssjekk (paritet). `GridQuad` (fire
+  hjørnepunkter, ikke en akse-rettet boks) er datamodellen for rutenettet
+  gjennom hele skanne-flyten, slik at et perspektivisk skjevt fotografert
+  rutenett kan representeres nøyaktig; typen er definert i
+  `src/cube/cornerDetection.ts` og gjenbrukt av `gridSampler.ts`.
+  `cornerDetection.ts` bruker [scanic](https://www.npmjs.com/package/scanic)
+  sin klassiske konturbaserte dokumentgjenkjenning (Suzuki-Abe
+  konturfølging + Ramer-Douglas-Peucker polygonforenkling +
+  geometrivalideringssjekker) til å finne dette hjørnepunktsettet automatisk
+  rett etter fotografering — se
+  `docs/superpowers/specs/2026-08-25-scanic-grid-detection-rewrite-design.md`
+  for algoritmen og designvalgene. `src/hooks/useCubeScan.ts` er
+  tilstandsmaskinen for skanne-veiviseren; `src/components/ScanWizard.tsx`
+  kjører automatikken og viser resultatet via `ScanGridOverlay.tsx`, som
+  tegner rutenettets omriss og kryss-linjer ut fra `GridQuad` og lar
+  brukeren dra hvert av de fire hjørnehåndtakene enkeltvis (eller hele
+  rutenettet samlet) for manuell korrigering; `ScanReview.tsx` er siste
+  steg for manuell retting før tilstanden tas i bruk
 - `src/cube/algorithms.ts`, `trainingProgress.ts` – algoritme-data
   (nybegynner + 2-look OLL/PLL, selv-verifisert til å rundtrippe til løst
   tilstand) og ren fremgangslogikk (streak, mestring, lagret peker) for
   algoritmetrening. `src/hooks/useAlgorithmTraining.ts` er
   tilstandsmaskinen; `src/components/TrainingWizard.tsx` er HUD-en som
   ligger over den eksisterende 3D-visningen uten å blokkere den.
+- `src/cube/guidedJourney.ts`, `src/hooks/useGuidedJourney.ts`,
+  `src/components/GuidedJourney.tsx` – den styrte løse-reisen: 7 steg satt
+  sammen av egne kors-/hjørne-case (`CROSS_ALGORITHMS`/`CORNER_ALGORITHMS`)
+  pluss et utvalg fra `algorithms.ts` sine eksisterende nybegynner-case.
+  `useGuidedJourney` speiler `useAlgorithmTraining.ts` sitt
+  ready/timing/solved/demonstrating-tilstandsmønster (samme
+  `SOLVED_PAUSE_MS`-pause før neste case settes opp), men med ett-gangs
+  fremgang lagret under en egen `localStorage`-nøkkel i stedet for
+  streak-basert mestring per spor. `GuidedJourney.tsx` er HUD-en, inkludert
+  den avsluttende feiringsskjermen. Se
+  `docs/superpowers/specs/2026-08-19-guided-solve-journey-design.md` for
+  fullt design.
 
 Kubens logiske tilstand holdes alltid som en 54-tegns facelet-streng. Under en
 trekk-animasjon (automatisk eller manuell) rendres kun det aktive laget i en

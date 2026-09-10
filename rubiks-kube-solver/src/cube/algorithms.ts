@@ -1,4 +1,4 @@
-export type TrainingTrack = 'beginner' | 'oll-pll-2look';
+export type TrainingTrack = 'notation' | 'beginner' | 'oll-pll-2look' | 'guided-basics';
 
 export interface AlgorithmCase {
   id: string;
@@ -8,6 +8,134 @@ export interface AlgorithmCase {
   solutionMoves: string;
   description: string;
 }
+
+export const NOTATION_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'notation-u',
+    track: 'notation',
+    name: 'U',
+    setupMoves: "U'",
+    solutionMoves: 'U',
+    description: 'U snur toppen ett hakk med klokken.',
+  },
+  {
+    id: 'notation-u-prime',
+    track: 'notation',
+    name: "U'",
+    setupMoves: 'U',
+    solutionMoves: "U'",
+    description: "Apostrofen (') betyr mot klokken - U' snur toppen ett hakk mot klokken.",
+  },
+  {
+    id: 'notation-u2',
+    track: 'notation',
+    name: 'U2',
+    setupMoves: 'U2',
+    solutionMoves: 'U2',
+    description: '2-tallet betyr dobbelt så mye - U2 snur toppen et helt halvt hakk.',
+  },
+  {
+    id: 'notation-r',
+    track: 'notation',
+    name: 'R',
+    setupMoves: "R'",
+    solutionMoves: 'R',
+    description: 'Hver bokstav er en side av kuben - R snur høyre side med klokken.',
+  },
+  {
+    id: 'notation-r-prime',
+    track: 'notation',
+    name: "R'",
+    setupMoves: 'R',
+    solutionMoves: "R'",
+    description: "R' snur høyre side mot klokken - samme regel som for U.",
+  },
+  {
+    id: 'notation-l',
+    track: 'notation',
+    name: 'L',
+    setupMoves: "L'",
+    solutionMoves: 'L',
+    description:
+      'L snur venstre side med klokken. Drei kameraet litt (dra utenfor kuben) så du ser den godt - trykk 🧭 for å komme tilbake.',
+  },
+  {
+    id: 'notation-f',
+    track: 'notation',
+    name: 'F',
+    setupMoves: "F'",
+    solutionMoves: 'F',
+    description: 'F snur forsiden (den som er mot deg) med klokken.',
+  },
+  {
+    id: 'notation-f-prime',
+    track: 'notation',
+    name: "F'",
+    setupMoves: 'F',
+    solutionMoves: "F'",
+    description: "F' snur forsiden mot klokken - samme regel som for U og R.",
+  },
+  {
+    id: 'notation-d',
+    track: 'notation',
+    name: 'D',
+    setupMoves: "D'",
+    solutionMoves: 'D',
+    description:
+      'D snur bunnen med klokken (sett nedenfra). Drei kameraet (dra utenfor kuben) til du ser bunnen godt - trykk 🧭 for å komme tilbake til vanlig visning.',
+  },
+  {
+    id: 'notation-b',
+    track: 'notation',
+    name: 'B',
+    setupMoves: "B'",
+    solutionMoves: 'B',
+    description:
+      '🔄 Baksiden er gjemt! Dra utenfor kuben for å dreie kameraet helt rundt til du ser den, snu den så B med klokken. Sitter du fast, trykk 🧭 for å komme tilbake. Nå har du lært alle seks sidene!',
+  },
+];
+
+export const CROSS_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'cross-flip-in-place',
+    track: 'guided-basics',
+    name: 'Kors: vend kanten',
+    setupMoves: 'F2',
+    solutionMoves: 'F2',
+    description:
+      'Kuben ser blandet ut - finn kant-brikken med korsets to farger. Den står rett over plassen, snudd feil vei. Ett trekk retter den opp.',
+  },
+  {
+    id: 'cross-free-then-place',
+    track: 'guided-basics',
+    name: 'Kors: løsne og sett på plass',
+    setupMoves: "R F'",
+    solutionMoves: "F R'",
+    description:
+      'Kuben ser blandet ut - finn kant-brikken med korsets to farger et sted på kuben. Løsne den, så setter den seg selv på plass.',
+  },
+];
+
+export const CORNER_ALGORITHMS: AlgorithmCase[] = [
+  {
+    id: 'corner-pocket',
+    track: 'guided-basics',
+    name: 'Hjørne: lomme-trikset',
+    setupMoves: "R U R'",
+    solutionMoves: "R U' R'",
+    description:
+      'Kuben ser blandet ut - finn hjørnet med korsets farge. Løft det ut av lomma, vend det riktig, og sett laget tilbake.',
+  },
+  {
+    id: 'corner-from-the-side',
+    track: 'guided-basics',
+    name: 'Hjørne: fra siden',
+    setupMoves: "F' D F",
+    solutionMoves: "F' D' F",
+    description:
+      'Kuben ser blandet ut - finn hjørnet med korsets farge på siden. Dette trikset drar det ut og setter det ned riktig vei.',
+  },
+];
 
 export const BEGINNER_ALGORITHMS: AlgorithmCase[] = [
   {
@@ -176,6 +304,8 @@ export const OLL_PLL_2LOOK_ALGORITHMS: AlgorithmCase[] = [
 ];
 
 export const TRACKS: Record<TrainingTrack, AlgorithmCase[]> = {
+  notation: NOTATION_ALGORITHMS,
   beginner: BEGINNER_ALGORITHMS,
   'oll-pll-2look': OLL_PLL_2LOOK_ALGORITHMS,
+  'guided-basics': [...CROSS_ALGORITHMS, ...CORNER_ALGORITHMS],
 };

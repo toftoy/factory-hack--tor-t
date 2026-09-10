@@ -7,7 +7,6 @@ import {
   loadProgress,
   recordAttempt,
   saveProgress,
-  showSolution,
   skipCase,
   type TrackProgress,
 } from './trainingProgress';
@@ -105,21 +104,6 @@ describe('recordAttempt', () => {
     p = recordAttempt(track, p, secondId, true, 3000);
     expect(p.stats[secondId].mastered).toBe(true);
     expect(p.currentIndex).toBe(0);
-  });
-});
-
-describe('showSolution', () => {
-  test('resets streak to zero without touching attempts/correct counts', () => {
-    let p = recordAttempt(track, emptyProgress(), firstId, true, 3000);
-    p = recordAttempt(track, p, firstId, true, 3000);
-    p = showSolution(p, firstId);
-    expect(p.stats[firstId]).toEqual({
-      streak: 0,
-      attempts: 2,
-      correct: 2,
-      bestTimeMs: 3000,
-      mastered: false,
-    });
   });
 });
 

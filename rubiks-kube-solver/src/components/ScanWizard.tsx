@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CubeScan } from '../hooks/useCubeScan';
-import type { GridBounds } from '../cube/gridSampler';
+import type { GridQuad } from '../cube/gridSampler';
+import { detectGridQuad } from '../cube/cornerDetection';
 import { ScanGridOverlay } from './ScanGridOverlay';
 
 const STEP_TEXT = [
@@ -22,7 +23,7 @@ interface Props {
 export function ScanWizard({ scan, onCancel }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [bounds, setBounds] = useState<GridBounds | null>(null);
+  const [quad, setQuad] = useState<GridQuad | null>(null);
 
   const phase = scan.phase;
   const isCapturingD = phase.kind === 'capturingD';
@@ -35,12 +36,23 @@ export function ScanWizard({ scan, onCancel }: Props) {
     canvas.height = image.naturalHeight;
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
-    const size = Math.min(image.naturalWidth, image.naturalHeight) * 0.7;
-    setBounds({
-      x: (image.naturalWidth - size) / 2,
-      y: (image.naturalHeight - size) / 2,
-      size,
+
+    // Reset immediately so a stale quad from the previous photo can never be
+    // confirmed against this new canvas while detection is still in flight
+    // (e.g. after "Ta nytt bilde" within the same step). handleConfirm bails
+    // out when quad is null, so this makes that window impossible.
+    setQuad(null);
+
+    // scanic downscales internally and returns corners already in this
+    // canvas's coordinate space - no manual downscale-and-scale-back needed.
+    let ignore = false;
+    detectGridQuad(canvas).then(({ quad }) => {
+      if (ignore) return;
+      setQuad(quad);
     });
+    return () => {
+      ignore = true;
+    };
   }, [image]);
 
   const handleFileChange = useCallback(
@@ -64,15 +76,15 @@ export function ScanWizard({ scan, onCancel }: Props) {
   );
 
   const handleConfirm = useCallback(() => {
-    if (!canvasRef.current || !bounds) return;
+    if (!canvasRef.current || !quad) return;
     const ctx = canvasRef.current.getContext('2d')!;
     if (isCapturingD) {
-      scan.confirmD(ctx, bounds);
+      scan.confirmD(ctx, quad);
     } else {
-      scan.confirmStep(ctx, bounds);
+      scan.confirmStep(ctx, quad);
     }
-    setBounds(null);
-  }, [scan, bounds, isCapturingD]);
+    setQuad(null);
+  }, [scan, quad, isCapturingD]);
 
   if (phase.kind !== 'capturing' && phase.kind !== 'capturingD') return null;
 
@@ -86,23 +98,44 @@ export function ScanWizard({ scan, onCancel }: Props) {
       </div>
 
       <p className="scan-instruction">{phase.kind === 'capturing' ? STEP_TEXT[phase.stepIndex] : D_STEP_TEXT}</p>
+      {quad && (
+        <p className="scan-hint">Sjekk at rutenettet ligger riktig på kubens side - dra i hjørnene om nødvendig.</p>
+      )}
 
       <div className="scan-photo-area">
         {image ? (
           <div
             style={{
               position: 'relative',
-              width: canvasRef.current?.width,
-              height: canvasRef.current?.height,
+              // This wrapper must end up exactly the same box as the
+              // <canvas> it contains, because the grid overlay <svg> is
+              // stretched across it with inset:0. Pinning width/height to
+              // the image's intrinsic pixel size and letting max-width and
+              // max-height clamp does NOT do that: the two clamps resolve
+              // independently against the photo area, so the wrapper takes
+              // the *container's* aspect ratio while the canvas (a replaced
+              // element, which re-clamps both axes together) keeps the
+              // *image's*. fit-content + an explicit aspect-ratio makes the
+              // wrapper shrink-wrap the canvas and keeps both clamps
+              // consistent. Verified in Chromium against portrait/landscape/
+              // square/extreme images in both width-bound and height-bound
+              // containers: canvas and svg rects agree to within 0.02px,
+              // and images smaller than the container are still not
+              // upscaled.
+              width: 'fit-content',
+              height: 'auto',
+              aspectRatio: canvasRef.current
+                ? `${canvasRef.current.width} / ${canvasRef.current.height}`
+                : undefined,
               maxWidth: '100%',
               maxHeight: '100%',
             }}
           >
             <canvas ref={canvasRef} className="scan-canvas" />
-            {bounds && canvasRef.current && (
+            {quad && canvasRef.current && (
               <ScanGridOverlay
-                bounds={bounds}
-                onChange={setBounds}
+                quad={quad}
+                onChange={setQuad}
                 canvasWidth={canvasRef.current.width}
                 canvasHeight={canvasRef.current.height}
               />
