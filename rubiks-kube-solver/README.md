@@ -21,12 +21,13 @@ two-phase-algoritme, med animerte trekk i 3D.
   kuben løftes aldri) og få tilstanden lastet inn direkte — se
   `docs/superpowers/specs/2026-08-17-camera-scanning-design.md` for
   hvordan bunnen og toppens retning regnes ut fra bare 5 bilder. Rutenettet
-  som skal leses av finner appen automatisk (klassisk kant-/gradientsøk,
+  som skal leses av finner appen automatisk (klassisk konturbasert
+  dokumentgjenkjenning via [scanic](https://www.npmjs.com/package/scanic),
   ikke ML) rett etter at bildet er tatt; ved lav treffsikkerhet faller den
   tilbake på et sentrert forslag. De fire hjørnehåndtakene i overlayet kan
   alltid dras enkeltvis for å rette opp perspektivet manuelt, uansett om
   automatikken traff eller ikke — se
-  `docs/superpowers/specs/2026-08-20-auto-grid-detection-design.md`.
+  `docs/superpowers/specs/2026-08-25-scanic-grid-detection-rewrite-design.md`.
 - **Tren på algoritmer**: øv på navngitte kube-algoritmer (nybegynnermetode
   eller 2-look OLL/PLL) direkte på 3D-kuben — appen setter opp et kjent
   case, du løser det selv ved å dra i lag, og appen tar tid og styrer
@@ -98,10 +99,13 @@ npm run preview        # server produksjonsbygget lokalt
   gjennom hele skanne-flyten, slik at et perspektivisk skjevt fotografert
   rutenett kan representeres nøyaktig; typen er definert i
   `src/cube/cornerDetection.ts` og gjenbrukt av `gridSampler.ts`.
-  `cornerDetection.ts` er også det klassiske kant-/gradientsøket som finner
-  dette hjørnepunktsettet automatisk rett etter fotografering — se
-  `docs/superpowers/specs/2026-08-20-auto-grid-detection-design.md` for
-  algoritmen og designvalgene. `src/hooks/useCubeScan.ts` er
+  `cornerDetection.ts` bruker [scanic](https://www.npmjs.com/package/scanic)
+  sin klassiske konturbaserte dokumentgjenkjenning (Suzuki-Abe
+  konturfølging + Ramer-Douglas-Peucker polygonforenkling +
+  geometrivalideringssjekker) til å finne dette hjørnepunktsettet automatisk
+  rett etter fotografering — se
+  `docs/superpowers/specs/2026-08-25-scanic-grid-detection-rewrite-design.md`
+  for algoritmen og designvalgene. `src/hooks/useCubeScan.ts` er
   tilstandsmaskinen for skanne-veiviseren; `src/components/ScanWizard.tsx`
   kjører automatikken og viser resultatet via `ScanGridOverlay.tsx`, som
   tegner rutenettets omriss og kryss-linjer ut fra `GridQuad` og lar

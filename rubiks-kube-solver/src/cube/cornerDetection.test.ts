@@ -196,6 +196,117 @@ function buildClutteredGridImage(
   return new ImageData(data, width, height);
 }
 
+/** Same wood-grain-stripe background as buildClutteredGridImage, but with
+ * two competing quads drawn on it: `bigQuad`'s 4 edges only (no internal
+ * lines - a plain large shape like a placemat or table edge), drawn first,
+ * then `cubeQuad`'s 4 edges plus its internal 3x3 grid lines drawn on top.
+ * Used to document a known scanic calibration limitation - see the
+ * "known limitation" describe block below. */
+function buildCompetingQuadImage(width: number, height: number, cubeQuad: GridQuad, bigQuad: GridQuad): ImageData {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const stripe = Math.sin(y * 0.4) * 15 + Math.sin((x + y) * 0.05) * 8;
+      data[i] = 190 + stripe;
+      data[i + 1] = 150 + stripe * 0.8;
+      data[i + 2] = 110 + stripe * 0.6;
+      data[i + 3] = 255;
+    }
+  }
+  const setPixel = (x: number, y: number) => {
+    const xi = Math.round(x);
+    const yi = Math.round(y);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const px = xi + dx;
+        const py = yi + dy;
+        if (px < 0 || py < 0 || px >= width || py >= height) continue;
+        const i = (py * width + px) * 4;
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+      }
+    }
+  };
+  const lerp = (a: Point, b: Point, t: number): Point => ({
+    x: a.x + (b.x - a.x) * t,
+    y: a.y + (b.y - a.y) * t,
+  });
+  const drawLine = (a: Point, b: Point) => {
+    for (let i = 0; i <= 200; i++) {
+      const p = lerp(a, b, i / 200);
+      setPixel(p.x, p.y);
+    }
+  };
+  const drawQuadEdges = (quad: GridQuad) => {
+    const [tl, tr, br, bl] = quad;
+    drawLine(tl, tr);
+    drawLine(tr, br);
+    drawLine(br, bl);
+    drawLine(bl, tl);
+  };
+  // Big plain quad first (no internal lines), so the cube's grid is drawn
+  // on top of/inside it.
+  drawQuadEdges(bigQuad);
+
+  drawQuadEdges(cubeQuad);
+  const [tl, tr, br, bl] = cubeQuad;
+  const quadPoint = (u: number, v: number): Point => {
+    const top = lerp(tl, tr, u);
+    const bottom = lerp(bl, br, u);
+    return lerp(top, bottom, v);
+  };
+  drawLine(quadPoint(1 / 3, 0), quadPoint(1 / 3, 1));
+  drawLine(quadPoint(2 / 3, 0), quadPoint(2 / 3, 1));
+  drawLine(quadPoint(0, 1 / 3), quadPoint(1, 1 / 3));
+  drawLine(quadPoint(0, 2 / 3), quadPoint(1, 2 / 3));
+
+  return new ImageData(data, width, height);
+}
+
+describe('detectGridQuad - known limitation (documented, not fixed)', () => {
+  test('a large plain competing quad in the background can outscore the real cube grid', async () => {
+    const width = 600;
+    const height = 500;
+    const cubeQuad: GridQuad = [
+      { x: 60, y: 60 },
+      { x: 220, y: 60 },
+      { x: 220, y: 220 },
+      { x: 60, y: 220 },
+    ];
+    // A large plain quad (e.g. a placemat, table edge, or picture frame) with
+    // no internal grid lines, drawn first so the cube's grid lines are drawn
+    // on top of/inside it.
+    const bigQuad: GridQuad = [
+      { x: 25, y: 25 },
+      { x: 560, y: 30 },
+      { x: 555, y: 460 },
+      { x: 30, y: 455 },
+    ];
+    const image = buildCompetingQuadImage(width, height, cubeQuad, bigQuad);
+    const result = await detectGridQuad(image);
+    // KNOWN LIMITATION (see final whole-branch review, 2026-09-10): scanic's
+    // confidence score is area/shape-dominated, not cube-specific, so this
+    // large plain background quad legitimately outscores the correct cube
+    // detection (confidence ~0.97 vs ~0.69 for the cube alone) - measured
+    // directly, not guessed. No CONFIDENCE_THRESHOLD value fixes this without
+    // also rejecting real good detections (the weakest verified real-photo
+    // detection is 0.609). This test intentionally documents the failure
+    // rather than asserting correct behavior, so a future fix (a
+    // cube-likeness post-filter) has a concrete regression case to target.
+    // If this test ever starts failing because scanic now prefers the cube,
+    // that's good news - update the assertions to match.
+    expect(result.confidence).toBeGreaterThan(0.9);
+    const [tl] = result.quad;
+    // The wrongly-detected quad's top-left lands near the big quad's corner
+    // (~25,25), not the cube's (60,60) - proving it locked onto the
+    // background shape, not the cube.
+    expect(tl.x).toBeLessThan(45);
+    expect(tl.y).toBeLessThan(45);
+  });
+});
+
 describe('detectGridQuad - cube-tuned robustness (regression corpus)', () => {
   test('finds an off-center grid over a textured background with a shadow past its true edge', async () => {
     const width = 600;

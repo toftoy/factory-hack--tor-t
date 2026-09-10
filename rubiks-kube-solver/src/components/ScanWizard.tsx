@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CubeScan } from '../hooks/useCubeScan';
 import type { GridQuad } from '../cube/gridSampler';
-import { detectGridQuad, isConfidentDetection } from '../cube/cornerDetection';
+import { detectGridQuad } from '../cube/cornerDetection';
 import { ScanGridOverlay } from './ScanGridOverlay';
 
 const STEP_TEXT = [
@@ -24,7 +24,6 @@ export function ScanWizard({ scan, onCancel }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [quad, setQuad] = useState<GridQuad | null>(null);
-  const [confidence, setConfidence] = useState(0);
 
   const phase = scan.phase;
   const isCapturingD = phase.kind === 'capturingD';
@@ -38,13 +37,18 @@ export function ScanWizard({ scan, onCancel }: Props) {
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
 
+    // Reset immediately so a stale quad from the previous photo can never be
+    // confirmed against this new canvas while detection is still in flight
+    // (e.g. after "Ta nytt bilde" within the same step). handleConfirm bails
+    // out when quad is null, so this makes that window impossible.
+    setQuad(null);
+
     // scanic downscales internally and returns corners already in this
     // canvas's coordinate space - no manual downscale-and-scale-back needed.
     let ignore = false;
-    detectGridQuad(canvas).then(({ quad, confidence }) => {
+    detectGridQuad(canvas).then(({ quad }) => {
       if (ignore) return;
       setQuad(quad);
-      setConfidence(confidence);
     });
     return () => {
       ignore = true;
@@ -80,7 +84,6 @@ export function ScanWizard({ scan, onCancel }: Props) {
       scan.confirmStep(ctx, quad);
     }
     setQuad(null);
-    setConfidence(0);
   }, [scan, quad, isCapturingD]);
 
   if (phase.kind !== 'capturing' && phase.kind !== 'capturingD') return null;
@@ -95,8 +98,8 @@ export function ScanWizard({ scan, onCancel }: Props) {
       </div>
 
       <p className="scan-instruction">{phase.kind === 'capturing' ? STEP_TEXT[phase.stepIndex] : D_STEP_TEXT}</p>
-      {quad && !isConfidentDetection(confidence) && (
-        <p className="scan-hint">Fant ikke rutenettet automatisk - dra i hjørnene for å rette det opp.</p>
+      {quad && (
+        <p className="scan-hint">Sjekk at rutenettet ligger riktig på kubens side - dra i hjørnene om nødvendig.</p>
       )}
 
       <div className="scan-photo-area">
