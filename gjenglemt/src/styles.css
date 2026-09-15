@@ -1,0 +1,65 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  background: #f5f5f5;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+button {
+  padding: 0.9rem 1rem;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #2b6777;
+  background: white;
+  color: #2b6777;
+}
+
+button.primary {
+  background: #2b6777;
+  color: white;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+input[type='text'],
+textarea {
+  padding: 0.6rem;
+  font-size: 1rem;
+  border-radius: 0.4rem;
+  border: 1px solid #ccc;
+  font-family: inherit;
+}
+
+.thumbnails {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.thumbnails img {
+  height: 96px;
+  border-radius: 0.4rem;
+  object-fit: cover;
+}
+
+.share-status a {
+  display: block;
+  margin-top: 0.5rem;
+}
