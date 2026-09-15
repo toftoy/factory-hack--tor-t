@@ -17,6 +17,7 @@ interface AppState {
   telefon: string;
   sted: string;
   melding: string;
+  meldingDirty: boolean;
 }
 
 const state: AppState = {
@@ -27,6 +28,7 @@ const state: AppState = {
   telefon: '',
   sted: '',
   melding: '',
+  meldingDirty: false,
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -132,13 +134,29 @@ function renderAnalyzingScreen(): HTMLElement {
   return container;
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
 async function analyze(): Promise<void> {
   const notePhoto = state.photos.find((p) => p.role === 'note')!;
   const garmentPhoto = state.photos.find((p) => p.role === 'garment')!;
 
   const [ocrText, sted] = await Promise.all([
-    runOcr(notePhoto.file).catch(() => ''),
-    resolveLocation(garmentPhoto.file).catch(() => null),
+    withTimeout(runOcr(notePhoto.file).catch(() => ''), 30_000, ''),
+    withTimeout(resolveLocation(garmentPhoto.file).catch(() => null), 15_000, null),
   ]);
 
   const { name, phone } = extractNameAndPhone(ocrText);
@@ -147,6 +165,7 @@ async function analyze(): Promise<void> {
   state.telefon = phone ?? '';
   state.sted = sted ?? '';
   state.melding = renderMessage({ navn: state.navn, sted: state.sted });
+  state.meldingDirty = false;
   state.screen = 'confirm';
   render();
 }
@@ -180,9 +199,27 @@ function renderConfirmScreen(): HTMLElement {
   }
   container.appendChild(thumbs);
 
+  const meldingLabel = document.createElement('label');
+  meldingLabel.textContent = 'Melding';
+  const meldingTextarea = document.createElement('textarea');
+  meldingTextarea.rows = 4;
+  meldingTextarea.value = state.melding;
+  meldingTextarea.addEventListener('input', () => {
+    state.melding = meldingTextarea.value;
+    state.meldingDirty = true;
+  });
+  meldingLabel.appendChild(meldingTextarea);
+
+  function syncMeldingIfNotDirty(): void {
+    if (state.meldingDirty) return;
+    state.melding = renderMessage({ navn: state.navn, sted: state.sted });
+    meldingTextarea.value = state.melding;
+  }
+
   container.appendChild(
     labeledTextInput('Navn', state.navn, (value) => {
       state.navn = value;
+      syncMeldingIfNotDirty();
     })
   );
   container.appendChild(
@@ -193,18 +230,10 @@ function renderConfirmScreen(): HTMLElement {
   container.appendChild(
     labeledTextInput('Sted', state.sted, (value) => {
       state.sted = value;
+      syncMeldingIfNotDirty();
     })
   );
 
-  const meldingLabel = document.createElement('label');
-  meldingLabel.textContent = 'Melding';
-  const meldingTextarea = document.createElement('textarea');
-  meldingTextarea.rows = 4;
-  meldingTextarea.value = state.melding;
-  meldingTextarea.addEventListener('input', () => {
-    state.melding = meldingTextarea.value;
-  });
-  meldingLabel.appendChild(meldingTextarea);
   container.appendChild(meldingLabel);
 
   const sendButton = document.createElement('button');

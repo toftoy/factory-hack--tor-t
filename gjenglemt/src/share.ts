@@ -1,7 +1,8 @@
 export function buildSmsLink(phone: string, body: string, userAgent: string): string {
   const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
   const separator = isIOS ? '&' : '?';
-  return `sms:${phone}${separator}body=${encodeURIComponent(body)}`;
+  const sanitizedPhone = phone.replace(/[^\d+]/g, '');
+  return `sms:${sanitizedPhone}${separator}body=${encodeURIComponent(body)}`;
 }
 
 export interface ShareResult {
@@ -20,8 +21,15 @@ export async function shareOrFallback(
     typeof navigator.share === 'function' &&
     navigator.canShare(shareData)
   ) {
-    await navigator.share(shareData);
-    return { shared: true };
+    try {
+      await navigator.share(shareData);
+      return { shared: true };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return { shared: true };
+      }
+      // any other error: fall through to the sms: fallback below
+    }
   }
   return { shared: false, fallbackSmsLink: buildSmsLink(phone, text, navigator.userAgent) };
 }

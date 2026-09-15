@@ -11,6 +11,19 @@ Se designdokumentet i
 `../docs/superpowers/specs/2026-09-15-gjenglemt-design.md` for
 bakgrunn og valgene bak løsningen.
 
+## Nettverk og lagring for tekstgjenkjenning (OCR)
+
+Tekstgjenkjenningen (OCR) av lappen kjører med Tesseract.js. Første
+gang appen brukes trenger den derfor internettilgang: OCR-motoren
+(kjøremotor, WASM-kjerne og en norsk språkmodell) lastes ned fra et
+CDN, til sammen noen få MB. Den nedlastede språkmodellen mellomlagres
+i nettleseren (IndexedDB), slik at senere bruk går raskere og kan
+fungere selv uten nett. Ingen brukerdata (bilder, navn,
+telefonnummer eller sted) er del av denne nedlastingen — det er en
+engangsnedlasting av en generisk, offentlig språkmodell, uavhengig av
+reversgeokodings-oppslaget mot Nominatim nevnt andre steder i
+dokumentasjonen.
+
 ## Kjøre lokalt
 
 ```bash
@@ -31,9 +44,15 @@ npm run preview
 ## Teste
 
 ```bash
-npm test    # enhetstester (vitest) for tekstuttrekk, meldingsmal, deling og sted
+npm test    # enhetstester (vitest) for tekstuttrekk, meldingsmal, deling, sted og capture-flow-tilstand
 npm run smoke   # headless sjekk av at appen laster (playwright)
 ```
+
+`npm run smoke` krever en lokal Chromium-installasjon. Sett
+miljøvariabelen `CHROMIUM_PATH` til stien til din Chromium, eller
+installer en med `npx playwright install chromium` og juster stien
+deretter — med mindre du kjører i et miljø som allerede har Chromium
+på standardstien.
 
 ## Ikoner
 
@@ -67,3 +86,9 @@ utviklingsomgivelsen:
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
       fylle inn Sted manuelt uten å henge seg opp
 - [ ] "Legg til på Hjem-skjerm" viser riktig ikon og navn
+- [ ] Sjekk om Sted faktisk fylles ut fra bildets EXIF-posisjon på
+      iPhone, eller om appen alltid faller tilbake til å be om
+      live posisjonstilgang i stedet (iOS Safari er kjent for av og
+      til å fjerne posisjonsmetadata fra bilder tatt via
+      `<input type="file">`, så fallback-veien kan i praksis være
+      vanligste tilfelle, ikke unntaket)

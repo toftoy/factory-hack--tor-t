@@ -11,7 +11,9 @@ if (!url) {
   throw new Error('Vite dev server did not report a local URL');
 }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',
+});
 try {
   const page = await browser.newPage();
   await page.goto(url);
