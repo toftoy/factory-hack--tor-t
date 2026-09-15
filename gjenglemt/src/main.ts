@@ -53,6 +53,17 @@ function labelForRole(role: PhotoRole): string {
   }
 }
 
+function nounForRole(role: PhotoRole): string {
+  switch (role) {
+    case 'note':
+      return 'lappen';
+    case 'garment':
+      return 'plagget';
+    case 'extra':
+      return 'ekstrabildet';
+  }
+}
+
 function renderCaptureButton(role: PhotoRole): HTMLElement {
   const wrapper = document.createElement('div');
 
@@ -164,7 +175,7 @@ function renderConfirmScreen(): HTMLElement {
   for (const photo of state.photos) {
     const img = document.createElement('img');
     img.src = URL.createObjectURL(photo.file);
-    img.alt = photo.role;
+    img.alt = nounForRole(photo.role);
     thumbs.appendChild(img);
   }
   container.appendChild(thumbs);
@@ -230,7 +241,7 @@ function renderConfirmScreen(): HTMLElement {
         const download = document.createElement('a');
         download.href = URL.createObjectURL(photo.file);
         download.download = photo.file.name || `${photo.role}.jpg`;
-        download.textContent = `Last ned ${photo.role}-bildet`;
+        download.textContent = `Last ned bilde av ${nounForRole(photo.role)}`;
         status.appendChild(download);
       }
     })();
