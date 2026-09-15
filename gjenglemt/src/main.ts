@@ -1,7 +1,7 @@
 import './styles.css';
 import type { CapturedPhoto, PhotoRole } from './types';
 import { nextCaptureRole, canProceed } from './capture';
-import { runOcr } from './ocr';
+import { runOcr, warmUpOcr } from './ocr';
 import { extractNameAndPhone } from './extract';
 import { resolveLocation } from './location';
 import { renderMessage } from './template';
@@ -9,10 +9,32 @@ import { shareOrFallback } from './share';
 
 type Screen = 'capture' | 'analyzing' | 'confirm';
 
+/**
+ * Hard budget between the shutter for the *last* photo and the confirm screen.
+ *
+ * Recognition is started the moment a photo is captured (see `startNoteOcr` and
+ * `startLocationLookup`) so that it overlaps the user taking their next photo
+ * and tapping through. This deadline is what is left of the budget by the time
+ * `analyze()` actually runs; anything still unfinished is dropped so the confirm
+ * screen never makes the user wait.
+ */
+const RESULT_DEADLINE_MS = 5_000;
+
+/** A recognition job started early, plus whatever partial text it has produced. */
+interface PendingOcr {
+  text: Promise<string>;
+  /** Best text from the passes that finished, for when the deadline cuts us off. */
+  partial: () => string;
+}
+
 interface AppState {
   screen: Screen;
   photos: CapturedPhoto[];
   extraRequested: boolean;
+  /** Timestamp of the most recent capture, whichever photo it was. */
+  lastCaptureAt: number;
+  ocr: PendingOcr | null;
+  location: Promise<string | null> | null;
   navn: string;
   telefon: string;
   sted: string;
@@ -24,6 +46,9 @@ const state: AppState = {
   screen: 'capture',
   photos: [],
   extraRequested: false,
+  lastCaptureAt: 0,
+  ocr: null,
+  location: null,
   navn: '',
   telefon: '',
   sted: '',
@@ -66,6 +91,31 @@ function nounForRole(role: PhotoRole): string {
   }
 }
 
+/**
+ * Start OCR on the note photo immediately, so it runs while the user is still
+ * taking the next photo instead of after they tap through.
+ *
+ * `runOcr` works through a ladder of preprocessing passes and asks this
+ * predicate after each one whether the text is good enough to stop. We treat
+ * "a phone number came out" as good enough, and remember the fullest text seen
+ * so far in case the deadline cuts the ladder short.
+ */
+function startNoteOcr(file: File): PendingOcr {
+  let best = '';
+  const text = runOcr(file, {
+    accept: (candidate) => {
+      if (candidate.trim().length > best.trim().length) best = candidate;
+      return extractNameAndPhone(candidate).phone !== null;
+    },
+  }).catch(() => best);
+  return { text, partial: () => best };
+}
+
+/** Same trick for the garment photo's location lookup. */
+function startLocationLookup(file: File): Promise<string | null> {
+  return resolveLocation(file).catch(() => null);
+}
+
 function renderCaptureButton(role: PhotoRole): HTMLElement {
   const wrapper = document.createElement('div');
 
@@ -78,6 +128,9 @@ function renderCaptureButton(role: PhotoRole): HTMLElement {
     const file = input.files?.[0];
     if (file) {
       state.photos.push({ role, file });
+      state.lastCaptureAt = Date.now();
+      if (role === 'note') state.ocr = startNoteOcr(file);
+      if (role === 'garment') state.location = startLocationLookup(file);
       render();
     }
   });
@@ -154,12 +207,18 @@ async function analyze(): Promise<void> {
   const notePhoto = state.photos.find((p) => p.role === 'note')!;
   const garmentPhoto = state.photos.find((p) => p.role === 'garment')!;
 
+  // Both jobs were started at capture time; only pick them up here. Whatever is
+  // left of the 5s budget since the last shutter is all the extra time they get.
+  const ocr = state.ocr ?? startNoteOcr(notePhoto.file);
+  const location = state.location ?? startLocationLookup(garmentPhoto.file);
+  const budget = Math.max(0, RESULT_DEADLINE_MS - (Date.now() - state.lastCaptureAt));
+
   const [ocrText, sted] = await Promise.all([
-    withTimeout(runOcr(notePhoto.file).catch(() => ''), 30_000, ''),
-    withTimeout(resolveLocation(garmentPhoto.file).catch(() => null), 15_000, null),
+    withTimeout(ocr.text, budget, null),
+    withTimeout(location, budget, null),
   ]);
 
-  const { name, phone } = extractNameAndPhone(ocrText);
+  const { name, phone } = extractNameAndPhone(ocrText ?? ocr.partial());
 
   state.navn = name ?? '';
   state.telefon = phone ?? '';
@@ -278,5 +337,10 @@ function renderConfirmScreen(): HTMLElement {
 
   return container;
 }
+
+// Pull the Tesseract worker and its language model down while the user is still
+// on the capture screen, so the first recognition does not also pay for a ~2MB
+// model download.
+void warmUpOcr();
 
 render();
