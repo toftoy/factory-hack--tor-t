@@ -473,3 +473,262 @@ right seam to slot it into.
 - The worker now lives for the session instead of being terminated per call, which
   holds WASM memory (tens of MB) for the life of the page. On a single-use flow like
   this that is a good trade for not re-downloading the model, but it is a change.
+
+---
+---
+
+# Round 2 — sideways label on a bottle (still broken after the first fix)
+
+The round-1 fix went live and the operator retested on their iPhone. Still broken:
+Name `"— - Be År oi"`, Phone empty. New evidence image: a lappeliten sticker stuck on
+a **curved translucent bottle/tube, with the text running vertically in the frame**.
+
+## 10. What actually went wrong — two real bugs, and it was not the timeout
+
+The working hypothesis handed to me was that the 5s deadline truncated the pass
+ladder before it reached the `[90, 270]` rotation fallbacks at positions 6 and 7.
+That is a reasonable reading, and the ladder ordering was genuinely bad, but it is
+**not** what produced this output. Running the shipped ladder against the new image
+shows both real causes directly:
+
+```
+img/C_bottle.png   (shipped round-1 ladder, per pass)
+dim=1280 rot=   0  conf= 91  "||"
+dim=1600 rot=   0  conf= 24  "pb.|||"
+dim=1000 rot=   0  conf= 42  "mm å|"
+dim=1280 rot=  12  conf= 48  "||> nå|NÆR|ot|Ka|"
+dim=1280 rot= -12  conf= 30  "3|ÆR SNE|—&|"
+dim=1280 rot=  90  conf= 82  "Anne/Nils|Toftøy|— —|"      <-- correct orientation
+dim=1280 rot= 270  conf= 47  "— ——|RØøyol|SjIN/auuy|"
+```
+
+### Bug A — the fallback tie-break actively selected the worst pass
+
+When no pass satisfies `accept`, round-1 `runOcr` returned **the longest text**.
+Look at the two candidates: the correct rot=90 pass produced 22 characters of clean
+text, and the mirrored garbage rot=270 pass produced 23. **The garbage wins by one
+character.** Even when every pass ran, the user was shown noise while a perfectly
+good `"Anne/Nils Toftøy"` sat in the discarded candidates. `"— - Be År oi"` is that
+tie-break, not a timeout.
+
+Tesseract's own word confidences separate these cleanly:
+
+```
+dim=1280 rot=  90  SCORE=15  kept=[Anne/Nils@90 Toftøy@91]
+every other pass  SCORE= 0  kept=[]
+```
+
+So passes are now ranked by **summed length of confident (>=60), substantial (>=3
+char) words**, not by text length.
+
+### Bug B — the number was lost to low contrast, not to orientation
+
+Note that even at the correct orientation the digit row came back as `"— —"`. These
+labels are dark grey on pale mint, here on a white translucent bottle; the bold name
+survives and the thinner digits do not. A fixed contrast boost recovers them at
+every scale tried:
+
+```
+psm=11 dim= 800 plain  conf=78  "Anne/Nils|Toftøy|— —|"
+psm=11 dim= 800 gamma  conf=84  "å Anne/Nils|Toftøy|47239791|"
+psm=11 dim=1280 plain  conf=54  "hø|Anne/Nils|Toftøy|rå|— ——|—|"
+psm=11 dim=1280 gamma  conf=81  "Anne/Nils|Toftøy|47239791|"
+psm=11 dim=1800 gamma  conf=81  "Anne/Nils|Toftøy|47239791|"
+psm=11 dim=2400 gamma  conf=80  "Anne/Nils|Toftøy|47239791|"
+```
+
+(`gamma` = fixed gain 1.8, bias -60. This is *not* the `normalise()` histogram
+stretch measured and rejected in round 1 — that is driven by outliers and mostly
+amplifies grain. Different operation, opposite result.)
+
+**So this photo would have failed even with an unlimited time budget.** Reaching
+pass 6 would have produced the right name and still no number.
+
+## 11. Contrast: measured as a default, rejected as a default
+
+Tempting to just apply the boost everywhere. Measured over 34 images, single pass at
+1280px:
+
+| preprocessing | phone correct | wrong | none | avg |
+| --- | --- | --- | --- | --- |
+| plain | 29/34 | 0 | 5 | 369ms |
+| gain 1.4 / bias -35 | **31/34** | 0 | 3 | 368ms |
+| gain 1.8 / bias -60 | 25/34 | 1 | 8 | 362ms |
+| gain 2.2 / bias -90 | 22/34 | 1 | 11 | 353ms |
+| CLAHE (local adaptive) | 26/34 | 2 | 6 | 800ms |
+
+The gentle 1.4 gain looked like a free win on phone numbers — but running the whole
+pipeline with it showed it eating the first letter of names (`"ari Nordmann"`,
+`"nne/Nils Toftøy"`), dropping name-exact from 33 to 32 and doubling wrong numbers.
+The strong 1.8 gain that the bottle needs blows out normally-exposed photos.
+
+So the boost is **one fallback pass**, never the default. It can then only ever add
+recoveries. CLAHE was rejected outright: worse *and* 2.2x slower.
+
+## 12. Orientation: a cheap probe instead of brute force
+
+Sideways labels are evidently a real case, not an edge case — the sticker is wrapped
+around a bottle. But full passes at 90 and 270 are expensive, and in round 1 they sat
+at positions 6 and 7 where the budget may never reach them.
+
+Recognition cost scales with pixel count, so a **640px probe is ~4x cheaper than a
+full pass** and only has to answer "which way up?", not read the label. Scoring the
+probes with the same confident-word measure picks the orientation reliably.
+
+Ordering matters as much as the probe. Probing first costs every ordinary upright
+photo three recognitions before any real work. Running the single best configuration
+first instead, and only probing when it fails, makes the common case one recognition:
+
+| pipeline | phone correct | wrong | missing | name exact | median recognitions | one-shot |
+| --- | --- | --- | --- | --- | --- | --- |
+| round-1 shipped ladder | 35/36 old set, **0/2 bottle** | 1 | 0 | 33/36 | 1 | 29/36 |
+| probe-first, gain 1.4 default | 38/42 | 2 | 2 | 32/42 | 4 | — |
+| probe-first, plain + boost fallback + score gate | 41/42 | 1 | 0 | 36/42 | 4 | — |
+| **primary pass first, then probe** | **41/42** | **1** | **0** | **37/42** | **1** | **28/42** |
+
+## 13. Wrong numbers: a score gate
+
+The probe-first variant produced two *wrong* phone numbers (`16165824`, `47259751`)
+on passes that had read nothing but background. A wrong number is the worst failure
+mode here — it looks plausible and invites the user to accept it.
+
+A pass's result is now only taken if its confident-word score clears 8. A pass that
+genuinely read the number scores at least the number's own 8 characters, while pure
+noise scores 0, so this rejects fabricated numbers without rejecting real reads. It
+removed both wrong numbers.
+
+## 14. Final pipeline and results
+
+```
+1. primary    1280px, upright, plain          <- 28/42 stop here
+2. probe       640px, +90                     } only if 1 failed
+3. probe       640px, -90 (270)               }
+4..8 refine at the winning orientation:
+     1600px plain | 1280px contrast-boosted | 1000px plain | +12 deg | -12 deg
+result = first accepted pass, else the highest-scoring pass
+```
+
+42 images (round-1 set + 2 bottle crops + 4 high-resolution sideways cases):
+
+```
+phone-correct 41/42   WRONG 1   missing 0   name-exact 37/42
+recognitions: median 1   p90 4   max 8   one-shot 28/42
+time (Node): median 368ms   p90 1360ms   max 3018ms
+```
+
+Both bottle cases now resolve to `47239791` / `Anne/Nils Toftøy` (6 recognitions,
+orientation 90). All four sideways cases resolve. `adv_skew12`, which regressed in
+an intermediate variant, is correct again. The single remaining wrong number
+(`syn_s4_skew`, last digit 2 read as 5) is a pre-existing character-level misread on
+a deliberately skewed synthetic.
+
+## 15. The 5s budget, honestly
+
+I still cannot measure browser WASM latency — `playwright-core install chromium` is
+blocked by this sandbox's egress policy, as in round 1. So rather than guess a
+multiplier, here is what is known and what is not:
+
+- **Known:** the common case is now **one recognition** rather than up to seven, and
+  the work that used to be needed at pass 6 now happens at pass 2-3. Whatever the
+  mobile multiplier turns out to be, the budget buys several times more coverage
+  than it did.
+- **Known:** a deadline hit no longer means empty fields. The partial fallback picks
+  the best-scoring completed pass, and that ranking is the round-2 fix — so a
+  truncated ladder now yields the best real reading so far instead of the noisiest.
+- **Not known:** actual per-pass wall-clock on the device. If a 1280px pass costs
+  ~2s on the phone, the one-shot case comfortably fits 5s and the 8-pass worst case
+  does not — it would rely on the early kickoff overlap plus the partial fallback.
+- **Not changed:** I have deliberately **not** moved the 5s number. Changing a budget
+  on the strength of another extrapolation is the mistake that produced this round.
+  The instrumentation below is there to replace the extrapolation with a measurement,
+  and if it shows 5s is not achievable, that is a decision to take with real numbers
+  and the operator's sign-off.
+
+## 16. TEMPORARY on-device diagnostics (`?debug=1`)
+
+**This is a temporary diagnostic aid, to be removed once the on-device bottleneck is
+understood.** It is marked `TEMPORARY DIAGNOSTIC` at every site:
+
+- `src/ocr.ts` — `OcrPassReport`, the `onPass` option, and the `stage` field.
+- `src/main.ts` — the `DEBUG` flag, the `diagnostics` state, `renderDebugPanel()`,
+  and its one call site on the confirm screen.
+- `src/styles.css` — the `.debug-panel` rules.
+
+Visiting <https://toftoy.github.io/factory-hack--tor-t/?debug=1> and completing the
+normal flow adds a collapsed **Debug** panel at the bottom of the confirm screen,
+with a "Kopier debug" button. Without `?debug=1` nothing changes. It reports:
+
+```
+deadlineHit=<bool>  budget=<ms>  waited=<ms>
+passes=<n>  ocrTime=<ms>  noteShutter->ocrDone=<ms>  noteShutter->lastShutter=<ms>
+ua=<user agent>
+
+1. pass  dim=1280 rot=0  <ms> score=<n> conf=<n> ok=<bool> :: "<first 120 chars>"
+2. probe dim=640  rot=90 <ms> score=<n> conf=<n> ok=<bool> :: "..."
+...
+```
+
+That is exactly the missing evidence: whether the deadline truncated anything, real
+per-pass milliseconds on the device, which orientation the probe chose, and what each
+pass actually read.
+
+## 17. Curvature — how hard is this case, really?
+
+The brief asked whether "label on a curved bottle" is fundamentally harder than
+"flat sticker on fabric". From this image: **the curvature is not what broke it.**
+Rotated upright, the label in this photo is flat enough that the text is not
+noticeably warped — the whole string sits on the flat-facing part of the tube, and
+both the name and the number read correctly once orientation and contrast are handled.
+What broke it was orientation plus low contrast, both of which are now addressed.
+
+That said, genuine cylindrical warp is a real limit worth stating plainly: if a label
+wraps far enough around a narrow object that characters are compressed and curved
+along the edge, no amount of 2D rotation retrying fixes it. Tesseract has no
+dewarping for that; it needs either a flattening transform (which needs the label's
+outline detected first) or a model that tolerates warp. **This photo is not that
+case, but a sticker wrapped around, say, a pencil or a thin bottle neck would be, and
+this fix should not be expected to handle it.**
+
+The translucency of the object is a smaller but real factor: it lowers label contrast
+and is what made the contrast-boost pass necessary.
+
+## 18. Verification (round 2)
+
+```
+$ npx tsc --noEmit        # clean
+
+$ npm run build
+✓ 35 modules transformed.
+dist/index.html                   0.59 kB │ gzip:  0.33 kB
+dist/assets/index-Ba6cZMhp.css    0.95 kB │ gzip:  0.46 kB
+dist/assets/index-BRJH_npQ.js   107.27 kB │ gzip: 39.22 kB
+✓ built in 114ms
+
+$ npx vitest run
+ Test Files  5 passed (5)
+      Tests  42 passed (42)
+
+$ node final3.mjs         # 42 images, shipped pipeline + compiled extract.ts
+phone-correct 41/42   WRONG 1   missing 0   name-exact 37/42
+recognitions: median 1   p90 4   max 8   one-shot 28/42
+time: median 368ms   p90 1360ms   max 3018ms
+```
+
+`extract.ts` was re-checked against the round-2 OCR output and needed no changes: it
+handled the sideways and contrast-boosted text correctly, including the two-line
+name. Its tests are unchanged at 18.
+
+## 19. Remaining risk (round 2)
+
+- **The browser path is still unexecuted.** Same sandbox limitation as round 1. This
+  is now the dominant unknown, and `?debug=1` exists specifically to close it.
+- **The bottle proxy is a screenshot thumbnail**, roughly 5 pixels per digit. That the
+  pipeline reads it at all is encouraging, but the real photo has far more detail, so
+  on-device behaviour could differ in either direction.
+- **Four of the six new cases are synthetic** sideways composites, not photographs of
+  a real sideways label.
+- **One wrong number remains** in evaluation, and the score gate reduces but does not
+  eliminate that class. The mandatory confirm screen stays load-bearing.
+- **Worst case is now 8 recognitions**, one more than round 1's 7. The common case is
+  much cheaper, but the tail is slightly longer; the partial fallback covers it.
+- **Genuine cylindrical warp is out of scope** — see section 17.

@@ -1,7 +1,7 @@
 import './styles.css';
 import type { CapturedPhoto, PhotoRole } from './types';
 import { nextCaptureRole, canProceed } from './capture';
-import { runOcr, warmUpOcr } from './ocr';
+import { runOcr, warmUpOcr, type OcrPassReport } from './ocr';
 import { extractNameAndPhone } from './extract';
 import { resolveLocation } from './location';
 import { renderMessage } from './template';
@@ -19,6 +19,33 @@ type Screen = 'capture' | 'analyzing' | 'confirm';
  * screen never makes the user wait.
  */
 const RESULT_DEADLINE_MS = 5_000;
+
+/**
+ * TEMPORARY DIAGNOSTIC (`?debug=1`).
+ *
+ * Every latency number behind the 5s budget was measured in Node with native
+ * libraries, never in a browser — there is no way to run one in the environment
+ * this was developed in. So we do not actually know how long a recognition pass
+ * takes on a real phone, and "the deadline cut the ladder short" and "recognition
+ * genuinely failed" look identical from the outside.
+ *
+ * With `?debug=1` the confirm screen grows a panel reporting exactly that: how
+ * many passes ran, how long each took, what each produced, and whether the
+ * deadline was hit. Remove this flag, the `diagnostics` state, `renderDebugPanel`,
+ * and `onPass`/`OcrPassReport` in `ocr.ts` once the real bottleneck is known.
+ * See `.superpowers/ocr-investigation-report.md`.
+ */
+const DEBUG = new URLSearchParams(window.location.search).get('debug') === '1';
+
+/** TEMPORARY DIAGNOSTIC — timings and per-pass results for the `?debug=1` panel. */
+interface Diagnostics {
+  passes: OcrPassReport[];
+  noteCapturedAt: number;
+  ocrSettledAt: number;
+  budgetMs: number;
+  waitedMs: number;
+  deadlineHit: boolean;
+}
 
 /** A recognition job started early, plus whatever partial text it has produced. */
 interface PendingOcr {
@@ -40,6 +67,8 @@ interface AppState {
   sted: string;
   melding: string;
   meldingDirty: boolean;
+  /** TEMPORARY DIAGNOSTIC — see `DEBUG`. */
+  diagnostics: Diagnostics;
 }
 
 const state: AppState = {
@@ -54,6 +83,14 @@ const state: AppState = {
   sted: '',
   melding: '',
   meldingDirty: false,
+  diagnostics: {
+    passes: [],
+    noteCapturedAt: 0,
+    ocrSettledAt: 0,
+    budgetMs: 0,
+    waitedMs: 0,
+    deadlineHit: false,
+  },
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -102,12 +139,22 @@ function nounForRole(role: PhotoRole): string {
  */
 function startNoteOcr(file: File): PendingOcr {
   let best = '';
+  state.diagnostics.noteCapturedAt = Date.now();
+  state.diagnostics.passes = [];
   const text = runOcr(file, {
-    accept: (candidate) => {
-      if (candidate.trim().length > best.trim().length) best = candidate;
-      return extractNameAndPhone(candidate).phone !== null;
+    accept: (candidate) => extractNameAndPhone(candidate).phone !== null,
+    onPass: (report) => {
+      // TEMPORARY DIAGNOSTIC — see DEBUG. Also doubles as the partial-result
+      // fallback: `runOcr` ranks passes by confident word content, so take the
+      // best-scoring text seen so far rather than the most recent or the longest.
+      state.diagnostics.passes.push(report);
+      const bestSoFar = state.diagnostics.passes.reduce((a, b) => (b.score > a.score ? b : a));
+      best = bestSoFar.text;
     },
   }).catch(() => best);
+  void text.then(() => {
+    state.diagnostics.ocrSettledAt = Date.now();
+  });
   return { text, partial: () => best };
 }
 
@@ -212,11 +259,17 @@ async function analyze(): Promise<void> {
   const ocr = state.ocr ?? startNoteOcr(notePhoto.file);
   const location = state.location ?? startLocationLookup(garmentPhoto.file);
   const budget = Math.max(0, RESULT_DEADLINE_MS - (Date.now() - state.lastCaptureAt));
+  const waitStartedAt = Date.now();
 
   const [ocrText, sted] = await Promise.all([
     withTimeout(ocr.text, budget, null),
     withTimeout(location, budget, null),
   ]);
+
+  // TEMPORARY DIAGNOSTIC — see DEBUG.
+  state.diagnostics.budgetMs = budget;
+  state.diagnostics.waitedMs = Date.now() - waitStartedAt;
+  state.diagnostics.deadlineHit = ocrText === null;
 
   const { name, phone } = extractNameAndPhone(ocrText ?? ocr.partial());
 
@@ -242,6 +295,62 @@ function labeledTextInput(
   input.addEventListener('input', () => onChange(input.value));
   label.appendChild(input);
   return label;
+}
+
+/**
+ * TEMPORARY DIAGNOSTIC (`?debug=1`) — see `DEBUG`.
+ *
+ * Renders the per-pass OCR report as selectable text plus a copy button, so the
+ * operator can paste back what actually happened on their phone. Delete this
+ * function together with the rest of the `?debug=1` plumbing.
+ */
+function renderDebugPanel(): HTMLElement {
+  const { passes, noteCapturedAt, ocrSettledAt, budgetMs, waitedMs, deadlineHit } =
+    state.diagnostics;
+
+  const totalOcrMs = passes.reduce((total, pass) => total + pass.ms, 0);
+  const lines = [
+    `deadlineHit=${deadlineHit}  budget=${budgetMs}ms  waited=${waitedMs}ms`,
+    `passes=${passes.length}  ocrTime=${totalOcrMs}ms` +
+      `  noteShutter->ocrDone=${ocrSettledAt ? ocrSettledAt - noteCapturedAt : -1}ms` +
+      `  noteShutter->lastShutter=${state.lastCaptureAt - noteCapturedAt}ms`,
+    `ua=${navigator.userAgent}`,
+    '',
+    ...passes.map(
+      (pass, index) =>
+        `${index + 1}. ${pass.stage} dim=${pass.maxDim} rot=${pass.rotation} ` +
+        `${pass.ms}ms score=${pass.score} conf=${Math.round(pass.confidence)} ` +
+        `ok=${pass.accepted} :: ${JSON.stringify(pass.text.replace(/\s+/g, ' ').slice(0, 120))}`
+    ),
+  ];
+  const report = lines.join('\n');
+
+  const details = document.createElement('details');
+  details.className = 'debug-panel';
+  const summary = document.createElement('summary');
+  summary.textContent = `Debug: ${passes.length} passes, ${totalOcrMs}ms${deadlineHit ? ', DEADLINE HIT' : ''}`;
+  details.appendChild(summary);
+
+  const pre = document.createElement('pre');
+  pre.textContent = report;
+  details.appendChild(pre);
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.textContent = 'Kopier debug';
+  copy.addEventListener('click', () => {
+    void navigator.clipboard?.writeText(report).then(
+      () => {
+        copy.textContent = 'Kopiert';
+      },
+      () => {
+        copy.textContent = 'Kunne ikke kopiere';
+      }
+    );
+  });
+  details.appendChild(copy);
+
+  return details;
 }
 
 function renderConfirmScreen(): HTMLElement {
@@ -305,6 +414,9 @@ function renderConfirmScreen(): HTMLElement {
   status.className = 'share-status';
   status.hidden = true;
   container.appendChild(status);
+
+  // TEMPORARY DIAGNOSTIC — see DEBUG.
+  if (DEBUG) container.appendChild(renderDebugPanel());
 
   sendButton.addEventListener('click', () => {
     void (async () => {

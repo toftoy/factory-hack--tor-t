@@ -63,3 +63,22 @@ textarea {
   display: block;
   margin-top: 0.5rem;
 }
+
+/*
+ * TEMPORARY DIAGNOSTIC — the ?debug=1 OCR pass panel. Remove together with the
+ * DEBUG plumbing in main.ts and onPass/OcrPassReport in ocr.ts once the
+ * on-device bottleneck is identified.
+ */
+.debug-panel {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+}
+
+.debug-panel pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f4f4f4;
+  padding: 0.5rem;
+  border-radius: 0.3rem;
+  user-select: text;
+}
