@@ -1257,3 +1257,139 @@ rather stop here, "ship round 3 and let the confirm screen absorb the tail" is a
 defensible position — 42 of 44 with a mandatory review step is a working product.
 My recommendation is to do the voting fallback because it is cheap, evidenced and
 targets the actual cause, not because the current state is unusable.
+
+---
+---
+
+# Round 5 — digit-focused multi-angle voting (implemented)
+
+Implements the round-4 recommendation. All numbers below are from the real-browser
+harness against the full 45-image set (the 44 from round 3 plus `crop3.jpg`, the
+new bottle photo).
+
+## 32. What was built
+
+**`ocr.ts` — a fourth stage.** When the *fast path* (the two primary passes plus
+the orientation probes) fails, a digit-only sweep runs: character whitelist
+`0123456789`, contrast boosted, 1280px, at rotations `-12, -8, -4, +4, +8`
+(offset by whatever orientation the probes chose). The sweep tallies the 8-digit
+strings its passes produce and takes the mode.
+
+The vote runs whenever the *fast path* failed — not merely when the refinement
+passes failed. That distinction is the whole point: a refinement pass clears the
+acceptance score on the strength of its confident *name* words while the number it
+read is junk, which is exactly how the bottle photo produced a confident
+`47250781`. On the tail the vote is the authority for the number; the refinement
+passes stay for the name.
+
+**Tie-breaking (`pickVotedValue`, unit-tested in the new `ocr.test.ts`).** A value
+is used only with at least two votes and no tie for first place. Every ambiguous
+shape resolves to "no answer": a three-way split of singletons, two candidates with
+one vote each, a 2-2 tie, or nothing recognised.
+
+**Abstention is not disagreement.** `voteOnDigits` reports whether any pass read a
+value at all. Three outcomes reach `main.ts`:
+
+| vote outcome | phone field |
+| --- | --- |
+| never ran (fast path succeeded) | from the text, as before |
+| ran, passes agreed | **the voted value**, overriding the text |
+| ran, passes read values but disagreed | **empty** |
+| ran, no pass read anything (abstained) | from the text, as before |
+
+That last row was a correction found in measurement, not a design guess — see 34.
+
+**`main.ts`** supplies `voteCandidate`, so `ocr.ts` still knows nothing about phone
+numbers. It collapses whitespace first, because a vote pass contains nothing but
+the number and Tesseract regularly breaks it across two lines.
+
+**Capture hint.** A one-line hint under the note-photo button:
+*"Tips: hold telefonen slik at teksten på lappen står vannrett."*
+
+## 33. Results
+
+```
+                       phone correct   wrong   missing   name exact
+round 3 (45 images)         42/45         2        1       35/45
+round 5                     44/45         1        0       36/45
+```
+
+Per-case changes:
+
+| image | round 3 | round 5 |
+| --- | --- | --- |
+| `crop3.jpg` (the new bottle) | wrong (`47250781`) | **correct** |
+| `adv_skew12.jpg` | missing | **correct** |
+| `syn_s1_skew.jpg` | wrong (`98765435`) | wrong (unchanged) |
+
+**Latency is unchanged for the overwhelming majority.** Only 5 of 45 images reach
+the tail at all; the other 40 finish in 2-3 passes at a median wall clock of
+~845ms, identical to round 3.
+
+```
+tail cases           passes   OCR       wall
+crop3.jpg              14     4675ms    4873ms
+adv_skew12.jpg         14     4798ms    5037ms
+syn_s4_skew.jpg        10     3084ms    3367ms
+syn_s1_far.jpg         10     2632ms    2861ms
+syn_s3_far.jpg         10     2641ms    2483ms
+```
+
+## 34. Two measurement errors in round 4, corrected here
+
+Worth recording, because both inflated the round-4 claim of 7/7.
+
+**(a) The round-4 lab scored hits with `text.replace(/\s/g,'')`, which ignores line
+breaks.** A pass that read `"47239\n791"` was counted as a correct read, but
+`extract.ts` is line-based and returns nothing for it. Fixed by collapsing
+whitespace in `voteCandidate` — legitimate here because a digit pass has no other
+lines to confuse. Before the fix `crop3.jpg` still failed (2 usable votes became 1,
+below the threshold); after it, it passes.
+
+**(b) Treating an abstaining vote as a veto lost correct answers.** The first
+implementation blanked the field whenever the vote had no winner. That cost two
+previously-correct cases, `syn_s1_far` and `syn_s3_far` — and inspecting them
+showed the digit passes had read *nothing at all* (`""`, `"57"`, `"32"`) because on
+those photos the label is small in frame and 1280px is too small for a digits-only
+pass, while the ladder read the number cleanly at 1600px. Silence is not evidence
+against the ladder. Distinguishing abstention from disagreement recovered both
+without weakening the guard against a confidently-wrong read.
+
+## 35. Verification
+
+```
+$ npx tsc --noEmit          # clean
+$ npm run build             # ✓ built
+$ npx vitest run            # Test Files 6 passed, Tests 48 passed
+$ node batch.mjs (45 images, real Chromium + real Tesseract.js WASM)
+  phone-correct 44/45  WRONG 1  missing 0  name-exact 36/45
+```
+
+`ocr.test.ts` is new: 8 tests covering the vote-tallying rule, including the
+ambiguous shapes that must resolve to "no answer". Recognition itself still has no
+unit test — it needs a real image and language model, and is covered by the
+browser harness instead.
+
+## 36. Residual risk
+
+- **The one remaining wrong number is not reachable by this mechanism.**
+  `syn_s1_skew.jpg` is answered by the *fast path* in 2 passes with a confidently
+  wrong last digit (`98765435`), so the vote never runs. Cross-checking the fast
+  path too would mean paying the vote's cost on every photo — roughly +1.5s on the
+  common case — which is a poor trade for one synthetic image. If wrong numbers
+  turn out to matter more in real use than this test set suggests, that is the lever.
+- **The tail is slower than round 3**: up to 14 passes and ~4.8s of OCR, against
+  round 3's ~3.8s. It still fits the 5s ceiling in desktop Chromium, but a phone is
+  slower, so the deepest cases will rely on the early-kickoff overlap (OCR starts at
+  the note shutter, so it runs while the user takes the second photo) and on the
+  best-scoring partial fallback. The obvious trim, if this bites, is that the
+  refinement passes now exist only for the *name* — the vote owns the number — so
+  most of them could be dropped or replaced by a single pass at the vote's winning
+  angle. I did not do that this round because it needs its own measurement.
+- **Name accuracy is still the weaker side** at 36/45, mostly dropped first or last
+  characters on the synthetic sideways composites. The voting mechanism deliberately
+  does not touch the name.
+- **Still desktop Chromium, not an iPhone.** `?debug=1` now also reports the digit
+  passes (`stage=digit`), so a real-device run shows the vote's tally directly.
+- **Sample caveats unchanged**: 45 images, 16 of them synthetic; the genuinely real
+  photos number four.

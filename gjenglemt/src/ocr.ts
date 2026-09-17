@@ -146,6 +146,32 @@ const REFINEMENT_PASSES: Pass[] = [
   { maxDim: DEFAULT_MAX_DIM, rotation: -12, boostContrast: true },
 ];
 
+/** Alphabet for the digit vote. Excluding letters stops the number picking any up. */
+const DIGIT_WHITELIST = '0123456789';
+
+/**
+ * Angles for the digit vote (see `voteOnDigits`).
+ *
+ * Every remaining failure measured after round 3 was an in-plane rotation of
+ * roughly 4 to 15 degrees, and Tesseract's line segmentation is *chaotic* under
+ * that parameter rather than smoothly degrading: on the bottle photo a one-degree
+ * sweep read the number correctly at ten of fifteen angles, and the four that
+ * failed (-13, -12, -10, -6) sit between angles that succeed. So the answer is not
+ * to estimate the angle more precisely — it is to sample several and see what most
+ * of them agree on.
+ */
+const DIGIT_VOTE_ROTATIONS = [-12, -8, -4, 4, 8];
+
+/**
+ * How many passes must agree before a voted value is used.
+ *
+ * Two is deliberately the floor rather than one: a single pass agreeing with
+ * nothing is exactly the confidently-wrong read this whole mechanism exists to
+ * reject. An empty field the user types into is much better than a plausible
+ * wrong phone number they might not check.
+ */
+const MIN_VOTES = 2;
+
 /**
  * TEMPORARY DIAGNOSTIC. One entry per recognition actually performed, so the
  * `?debug=1` panel can show what really happened on a real phone — how many passes
@@ -154,7 +180,7 @@ const REFINEMENT_PASSES: Pass[] = [
  * See `.superpowers/ocr-investigation-report.md`.
  */
 export interface OcrPassReport {
-  stage: 'probe' | 'pass';
+  stage: 'probe' | 'pass' | 'digit';
   maxDim: number;
   rotation: number;
   ms: number;
@@ -173,10 +199,69 @@ export interface RunOcrOptions {
    * caller supplies this (see `main.ts`, which asks `extract.ts`).
    */
   accept?: (text: string) => boolean;
+  /**
+   * Pull out the value worth voting on, or null if this text has none.
+   *
+   * When the fast path fails, `runOcr` runs a dedicated digit sweep and tallies
+   * what this returns across the passes (see `voteOnDigits`). Supplying it keeps
+   * `ocr.ts` ignorant of what a phone number looks like — `main.ts` answers with
+   * `extract.ts`.
+   */
+  voteCandidate?: (text: string) => string | null;
   /** Abort remaining passes once this signal aborts. */
   signal?: AbortSignal;
   /** TEMPORARY DIAGNOSTIC — see `OcrPassReport`. */
   onPass?: (report: OcrPassReport) => void;
+}
+
+export interface OcrResult {
+  /** Best text the ladder produced, for the caller to parse as usual. */
+  text: string;
+  /**
+   * Outcome of the digit vote. Three states, and the caller must tell them apart:
+   *
+   *  - `undefined` — the vote has nothing to say, either because the fast path
+   *    already succeeded so it never ran, or because it ran and *abstained*: not
+   *    one of its passes read a value. Trust the number in `text`.
+   *  - a string — the vote ran and the passes agreed. This value wins over
+   *    anything in `text`, which came from passes the vote exists to distrust.
+   *  - `null` — the vote ran, its passes *did* read values, and they disagreed.
+   *    Report no value at all rather than an unvalidated number from `text`.
+   *
+   * Abstention and disagreement are deliberately different. On a photo where the
+   * label is small in frame the digit passes read nothing whatsoever while the
+   * ladder read the number perfectly at a larger size — silence is not evidence
+   * against the ladder, and treating it as such threw away correct answers.
+   */
+  voted: string | null | undefined;
+}
+
+/**
+ * Pick the value the passes agree on: the mode, if it is unambiguous and clears
+ * `MIN_VOTES`. Exported for unit testing; the rules are deliberately strict.
+ *
+ * Every ambiguous shape resolves to "no answer" rather than a guess — a tie for
+ * first place, a field of one-vote singletons, or nothing recognised at all.
+ */
+export function pickVotedValue(candidates: (string | null)[]): string | null {
+  const tally = new Map<string, number>();
+  for (const candidate of candidates) {
+    if (candidate) tally.set(candidate, (tally.get(candidate) ?? 0) + 1);
+  }
+  let winner: string | null = null;
+  let best = 0;
+  let tied = false;
+  for (const [value, count] of tally) {
+    if (count > best) {
+      best = count;
+      winner = value;
+      tied = false;
+    } else if (count === best) {
+      tied = true;
+    }
+  }
+  if (tied || best < MIN_VOTES) return null;
+  return winner;
 }
 
 type Worker = Awaited<ReturnType<typeof Tesseract.createWorker>>;
@@ -373,8 +458,11 @@ async function recognize(
   return { text: data.text, score: scoreRecognition(data), confidence: data.confidence };
 }
 
-export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Promise<string> {
-  const { accept, signal, onPass } = options;
+export async function runOcr(
+  imageFile: File,
+  options: RunOcrOptions = {}
+): Promise<OcrResult> {
+  const { accept, voteCandidate, signal, onPass } = options;
   const [worker, image] = await Promise.all([getWorker(), loadImageElement(imageFile)]);
 
   // Two separate bests: an accepted pass always beats an unaccepted one, however
@@ -446,6 +534,10 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
     }
   }
 
+  // Whether the cheap stages above answered it. Anything beyond this point is the
+  // tail, where the number read straight out of a pass is not to be trusted.
+  const settledInFastPath = settled;
+
   // Stage 3: refine at whichever orientation won. With no orientation signal at
   // all this stays upright, which is the right prior.
   if (!settled) {
@@ -465,6 +557,94 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
     }
   }
 
+  // Stage 4: the digit vote. It runs whenever the *fast path* failed, even if a
+  // refinement pass later declared itself happy — a refinement pass clears the
+  // acceptance score on the strength of its confident *name* words while the
+  // number it read is junk, which is exactly how the bottle photo produced a
+  // confident `47250781`. On the tail the vote is the authority for the number;
+  // the refinement passes above stay for the name.
+  let voted: string | null | undefined;
+  if (voteCandidate && !settledInFastPath && recognised && !signal?.aborted) {
+    const vote = await voteOnDigits({
+      worker,
+      image,
+      orientation,
+      voteCandidate,
+      signal,
+      onPass,
+    });
+    // Abstention (nothing read at all) leaves `voted` undefined, so the ladder's
+    // own answer stands; only real disagreement blanks the field.
+    voted = vote.winner ?? (vote.sawCandidate ? null : undefined);
+  }
+
   if (!recognised && lastError) throw lastError;
-  return (bestAccepted ?? bestAny).text;
+  return { text: (bestAccepted ?? bestAny).text, voted };
+}
+
+/**
+ * Read the digit string several times over and return what most reads agree on.
+ *
+ * Restricting the alphabet to digits stops the number absorbing stray letters,
+ * and sweeping rotations exploits the fact that the engine's errors *scatter*
+ * while the truth *concentrates*: each bad angle fails in its own way, so the
+ * correct string is the mode and the wrong ones are singletons. Measured 7/7 on
+ * the round-4 test set, including all three cases the ladder alone gets wrong.
+ *
+ * Deliberately does not touch the caller's best-text bookkeeping: these passes
+ * contain no letters, so they can never be the text the name is read from.
+ */
+async function voteOnDigits({
+  worker,
+  image,
+  orientation,
+  voteCandidate,
+  signal,
+  onPass,
+}: {
+  worker: Worker;
+  image: HTMLImageElement;
+  orientation: number;
+  voteCandidate: (text: string) => string | null;
+  signal?: AbortSignal;
+  onPass?: (report: OcrPassReport) => void;
+}): Promise<{ winner: string | null; sawCandidate: boolean }> {
+  const candidates: (string | null)[] = [];
+  try {
+    await worker.setParameters({ tessedit_char_whitelist: DIGIT_WHITELIST });
+    for (const rotation of DIGIT_VOTE_ROTATIONS) {
+      if (signal?.aborted) break;
+      const pass: Pass = {
+        maxDim: DEFAULT_MAX_DIM,
+        rotation: (rotation + orientation + 360) % 360,
+        boostContrast: true,
+      };
+      const startedAt = Date.now();
+      try {
+        const result = await recognize(worker, image, pass);
+        const candidate = voteCandidate(result.text);
+        candidates.push(candidate);
+        onPass?.({
+          stage: 'digit',
+          maxDim: pass.maxDim,
+          rotation: pass.rotation,
+          ms: Date.now() - startedAt,
+          score: result.score,
+          confidence: result.confidence,
+          text: result.text,
+          accepted: candidate !== null,
+        });
+      } catch {
+        // A failed angle is just a missing vote.
+      }
+    }
+  } finally {
+    // The worker is a session-long singleton, so the whitelist has to come off
+    // again or every later recognition would be digits-only.
+    await worker.setParameters({ tessedit_char_whitelist: '' }).catch(() => undefined);
+  }
+  return {
+    winner: pickVotedValue(candidates),
+    sawCandidate: candidates.some((candidate) => candidate !== null),
+  };
 }

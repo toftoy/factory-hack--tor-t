@@ -1,7 +1,7 @@
 import './styles.css';
 import type { CapturedPhoto, PhotoRole } from './types';
 import { nextCaptureRole, canProceed } from './capture';
-import { runOcr, warmUpOcr, type OcrPassReport } from './ocr';
+import { runOcr, warmUpOcr, type OcrPassReport, type OcrResult } from './ocr';
 import { extractNameAndPhone } from './extract';
 import { resolveLocation } from './location';
 import { renderMessage } from './template';
@@ -49,7 +49,7 @@ interface Diagnostics {
 
 /** A recognition job started early, plus whatever partial text it has produced. */
 interface PendingOcr {
-  text: Promise<string>;
+  result: Promise<OcrResult>;
   /** Best text from the passes that finished, for when the deadline cuts us off. */
   partial: () => string;
 }
@@ -160,21 +160,34 @@ function startNoteOcr(file: File): PendingOcr {
   let best = '';
   state.diagnostics.noteCapturedAt = Date.now();
   state.diagnostics.passes = [];
-  const text = runOcr(file, {
+  const result = runOcr(file, {
     accept: (candidate) => extractNameAndPhone(candidate).phone !== null,
+    // What the digit vote tallies. `ocr.ts` only knows it is comparing strings.
+    //
+    // The whitespace collapse matters: a vote pass contains nothing but the
+    // number, and Tesseract quite often breaks it across two lines ("47239" /
+    // "791"). `extractNameAndPhone` is line-based — rightly, since on a real
+    // label the lines mean something — so without this it reads two short runs
+    // and reports no number. There are no other lines here to confuse, and a
+    // digit group that only lines up by accident will not repeat across angles.
+    voteCandidate: (candidate) => extractNameAndPhone(candidate.replace(/\s+/g, ' ')).phone,
     onPass: (report) => {
       // TEMPORARY DIAGNOSTIC — see DEBUG. Also doubles as the partial-result
       // fallback: `runOcr` ranks passes by confident word content, so take the
       // best-scoring text seen so far rather than the most recent or the longest.
       state.diagnostics.passes.push(report);
-      const bestSoFar = state.diagnostics.passes.reduce((a, b) => (b.score > a.score ? b : a));
-      best = bestSoFar.text;
+      // Digit-vote passes hold no letters, so they can never be the text a name
+      // is read from.
+      const nameBearing = state.diagnostics.passes.filter((p) => p.stage !== 'digit');
+      if (nameBearing.length > 0) {
+        best = nameBearing.reduce((a, b) => (b.score > a.score ? b : a)).text;
+      }
     },
-  }).catch(() => best);
-  void text.then(() => {
+  }).catch((): OcrResult => ({ text: best, voted: undefined }));
+  void result.then(() => {
     state.diagnostics.ocrSettledAt = Date.now();
   });
-  return { text, partial: () => best };
+  return { result, partial: () => best };
 }
 
 /**
@@ -237,6 +250,17 @@ function renderCaptureButton(role: PhotoRole): HTMLElement {
   button.addEventListener('click', () => input.click());
 
   wrapper.append(button, input);
+
+  // Every OCR failure left after round 4 came down to the label being rotated in
+  // the frame, and unlike a curved or shiny surface the user can fix that for
+  // free by turning the phone. Only worth saying for the note photo.
+  if (role === 'note') {
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'Tips: hold telefonen slik at teksten på lappen står vannrett.';
+    wrapper.appendChild(hint);
+  }
+
   return wrapper;
 }
 
@@ -356,17 +380,23 @@ async function analyze(): Promise<void> {
   // Only OCR gates the screen. Location gets whatever time OCR happened to take
   // and is then taken as-is; if it has not landed yet it keeps going and
   // `backfillLocation` fills the field in when it does.
-  const ocrText = await withTimeout(ocr.text, budget, null);
+  const ocrResult = await withTimeout(ocr.result, budget, null);
 
   // TEMPORARY DIAGNOSTIC — see DEBUG.
   state.diagnostics.budgetMs = budget;
   state.diagnostics.waitedMs = Date.now() - waitStartedAt;
-  state.diagnostics.deadlineHit = ocrText === null;
+  state.diagnostics.deadlineHit = ocrResult === null;
 
-  const { name, phone } = extractNameAndPhone(ocrText ?? ocr.partial());
+  const { name, phone } = extractNameAndPhone(ocrResult?.text ?? ocr.partial());
+
+  // The digit vote overrules the number read straight out of the text whenever it
+  // ran — including when it ran and found no agreement, where the honest answer
+  // is an empty field rather than a number no two passes could corroborate.
+  const voted = ocrResult?.voted;
+  const telefon = voted === undefined ? phone : voted;
 
   state.navn = name ?? '';
-  state.telefon = phone ?? '';
+  state.telefon = telefon ?? '';
   state.sted = location.resolved ?? '';
   state.melding = renderMessage({ navn: state.navn, sted: state.sted });
   state.meldingDirty = false;
