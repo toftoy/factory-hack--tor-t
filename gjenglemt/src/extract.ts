@@ -59,7 +59,10 @@ interface PhoneHit {
  * split them ("Ida Marie" / "." / "Hauge") and cost us half the name.
  */
 function isSpeckle(line: string): boolean {
-  if (/\d/.test(line)) return false;
+  // Keep anything with a real run of digits — that is a phone number candidate,
+  // however mangled. A lone stray digit is not: real OCR output put a bare "0"
+  // between the two lines of "Ida Marie" / "Hauge" and cost us half the name.
+  if (/\d{4,}/.test(line.replace(new RegExp(`[${PHONE_SEPARATORS}]`, 'g'), ''))) return false;
   if (looksLikeName(line)) return false;
   return (line.match(/\p{L}/gu) ?? []).length < 3;
 }

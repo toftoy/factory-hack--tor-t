@@ -18,7 +18,8 @@ import Tesseract, { PSM } from 'tesseract.js';
  *     thinner digit row does not: on the bottle photo the plain pipeline read
  *     "Anne/Nils / Toftøy / — —", losing the number entirely, while the same
  *     image with a fixed contrast boost read "Anne/Nils / Toftøy / 47239791" at
- *     every scale tried. So the boost is applied on every pass, not as a fallback.
+ *     every scale tried. Which of plain and boosted wins is image-dependent, so
+ *     the first stage runs both and takes whichever found more confident text.
  *     (Note this is a fixed gain/bias, *not* a histogram stretch — a global
  *     `normalise()`-style stretch was measured separately and made things worse,
  *     because on a photo with a bright background it mostly amplifies grain.)
@@ -48,16 +49,28 @@ const DEFAULT_MAX_DIM = 1280;
 const PROBE_MAX_DIM = 640;
 
 /**
- * Contrast boost, applied only on the dedicated rescue pass below.
+ * Contrast boost. Never the sole preprocessing for a size — always paired with,
+ * or a fallback to, a plain pass at the same size.
  *
- * Measured both ways: applying a gain to *every* pass is a net loss. A gentle
- * gain (1.4) scored 31/34 against 29/34 plain on phone numbers but started eating
- * the first letter of names ("ari Nordmann"), and a strong gain (1.8) dropped to
- * 25/34 because it blows out normally-exposed photos. Used as one fallback pass
- * it can only ever add recoveries, which is what the bottle photo needs.
+ * A gentle gain (1.4) applied unconditionally to every pass was measured as a net
+ * loss: it started eating the first letter of names ("ari Nordmann"). This
+ * stronger gain blows out normally-exposed photos outright. Pairing it with a
+ * plain pass and taking the better-scoring result gets its upside — it is what
+ * reads the thin digit row on a pale label — without its downside.
  */
 const CONTRAST_GAIN = 1.8;
 const CONTRAST_BIAS = -60;
+
+/**
+ * How much a pass may *enlarge* an image that is already smaller than its target.
+ *
+ * A real camera photo is always far bigger than any target here, so this never
+ * applies to one. It matters for small inputs — a cropped or shared image, or a
+ * photo from a low-resolution source — where leaving the pixels alone hands
+ * Tesseract text only a few pixels tall. Capped so a tiny image cannot blow up
+ * into an enormous canvas.
+ */
+const MAX_UPSCALE = 4;
 
 /**
  * A pass must find at least this much confident text before its result is taken.
@@ -85,17 +98,37 @@ interface Pass {
   maxDim: number;
   /** Extra rotation applied after downscaling, in degrees. */
   rotation: number;
-  /** Apply the contrast boost. Off except on the dedicated rescue pass. */
+  /** Apply the contrast boost. See `CONTRAST_GAIN`. */
   boostContrast?: boolean;
 }
 
-/** The best single configuration measured. Most photos are answered here and stop. */
-const PRIMARY_PASS: Pass = { maxDim: DEFAULT_MAX_DIM, rotation: 0 };
+/**
+ * First stage: the best target size, tried both plain and contrast-boosted.
+ *
+ * Which of the two wins is image-dependent and not predictable in advance, and
+ * getting it wrong is expensive in a way the rest of the ladder cannot repair:
+ * a pass that reads the digits *confidently but wrongly* is accepted and stops
+ * everything. Measured in a real browser, plain read `res_3024.jpg` as
+ * "3 7239791" and `res_1563.jpg` as "4725 .." while boosted read both correctly,
+ * so both run and the better-scoring one is taken. The cost is one extra
+ * recognition, a few hundred milliseconds inside a five-second budget.
+ */
+const PRIMARY_PASSES: Pass[] = [
+  { maxDim: DEFAULT_MAX_DIM, rotation: 0 },
+  { maxDim: DEFAULT_MAX_DIM, rotation: 0, boostContrast: true },
+];
 
 /**
  * Quarter turns the probe chooses between once upright has already failed.
  *
- * Upright is not probed because `PRIMARY_PASS` just tried it at full quality.
+ * Upright is not probed because `PRIMARY_PASSES` just tried it at full quality.
+ *
+ * The probes run *with* the contrast boost, unlike the passes. Measured in a real
+ * browser over eight sideways cases: plain probes picked the right orientation
+ * 6/8 and returned literally nothing on the other two, which were the
+ * low-contrast ones — so the orientation fallback was blind on exactly the
+ * images that need it. Boosted probes picked correctly 8/8, and on several
+ * cases read the whole label outright and finished there.
  */
 const PROBE_ROTATIONS = [90, 270];
 
@@ -107,10 +140,10 @@ const PROBE_ROTATIONS = [90, 270];
  */
 const REFINEMENT_PASSES: Pass[] = [
   { maxDim: 1600, rotation: 0 },
-  { maxDim: DEFAULT_MAX_DIM, rotation: 0, boostContrast: true },
-  { maxDim: 1000, rotation: 0 },
-  { maxDim: DEFAULT_MAX_DIM, rotation: 12 },
-  { maxDim: DEFAULT_MAX_DIM, rotation: -12 },
+  { maxDim: 1600, rotation: 0, boostContrast: true },
+  { maxDim: 1000, rotation: 0, boostContrast: true },
+  { maxDim: DEFAULT_MAX_DIM, rotation: 12, boostContrast: true },
+  { maxDim: DEFAULT_MAX_DIM, rotation: -12, boostContrast: true },
 ];
 
 /**
@@ -246,7 +279,7 @@ function shrinkTowards(
 function preprocess(image: HTMLImageElement, pass: Pass): HTMLCanvasElement {
   const sourceWidth = image.naturalWidth || image.width;
   const sourceHeight = image.naturalHeight || image.height;
-  const scale = Math.min(1, pass.maxDim / Math.max(sourceWidth, sourceHeight));
+  const scale = Math.min(MAX_UPSCALE, pass.maxDim / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
   const shrunk = shrinkTowards(image, width, height);
@@ -344,7 +377,11 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
   const { accept, signal, onPass } = options;
   const [worker, image] = await Promise.all([getWorker(), loadImageElement(imageFile)]);
 
-  let best: Recognition = { text: '', score: -1, confidence: 0 };
+  // Two separate bests: an accepted pass always beats an unaccepted one, however
+  // much text the unaccepted one found, because only an accepted pass actually
+  // produced what the caller is looking for.
+  let bestAccepted: Recognition | null = null;
+  let bestAny: Recognition = { text: '', score: -1, confidence: 0 };
   let recognised = false;
   let settled = false;
   let lastError: unknown = null;
@@ -364,8 +401,11 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
     recognised = true;
     const accepted =
       result.score >= MIN_ACCEPT_SCORE && (accept ? accept(result.text) : true);
-    if (result.score > best.score) best = result;
-    if (accepted) settled = true;
+    if (result.score > bestAny.score) bestAny = result;
+    if (accepted) {
+      if (!bestAccepted || result.score > bestAccepted.score) bestAccepted = result;
+      settled = true;
+    }
     onPass?.({
       stage,
       maxDim: pass.maxDim,
@@ -379,9 +419,13 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
     return result.score;
   };
 
-  // Stage 1: the best single configuration, upright. Most photos stop here, so
-  // the common case costs exactly one recognition.
-  await attempt(PRIMARY_PASS, 'pass');
+  // Stage 1: the best target size upright, plain and boosted. Both always run —
+  // no early break — so `bestAccepted` ends up holding whichever of the two found
+  // more confident text, rather than just the first one that looked plausible.
+  for (const pass of PRIMARY_PASSES) {
+    if (signal?.aborted) break;
+    await attempt(pass, 'pass');
+  }
 
   // Stage 2: only now, having failed upright, ask whether the label is sideways —
   // a name sticker wrapped around a bottle or a pencil case reads at a quarter
@@ -391,7 +435,10 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
     let bestProbeScore = 0;
     for (const rotation of PROBE_ROTATIONS) {
       if (settled || signal?.aborted) break;
-      const score = await attempt({ maxDim: PROBE_MAX_DIM, rotation }, 'probe');
+      const score = await attempt(
+        { maxDim: PROBE_MAX_DIM, rotation, boostContrast: true },
+        'probe'
+      );
       if (score !== null && score > bestProbeScore) {
         bestProbeScore = score;
         orientation = rotation;
@@ -402,8 +449,9 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
   // Stage 3: refine at whichever orientation won. With no orientation signal at
   // all this stays upright, which is the right prior.
   if (!settled) {
+    // When a quarter turn won, the primary sizes have not been tried there yet.
     const passes =
-      orientation === 0 ? REFINEMENT_PASSES : [PRIMARY_PASS, ...REFINEMENT_PASSES];
+      orientation === 0 ? REFINEMENT_PASSES : [...PRIMARY_PASSES, ...REFINEMENT_PASSES];
     for (const pass of passes) {
       if (settled || signal?.aborted) break;
       await attempt(
@@ -418,5 +466,5 @@ export async function runOcr(imageFile: File, options: RunOcrOptions = {}): Prom
   }
 
   if (!recognised && lastError) throw lastError;
-  return best.text;
+  return (bestAccepted ?? bestAny).text;
 }

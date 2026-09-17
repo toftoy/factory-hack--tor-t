@@ -732,3 +732,231 @@ name. Its tests are unchanged at 18.
 - **Worst case is now 8 recognitions**, one more than round 1's 7. The common case is
   much cheaper, but the tail is slightly longer; the partial fallback covers it.
 - **Genuine cylindrical warp is out of scope** — see section 17.
+
+---
+---
+
+# Round 3 — measured in a real browser
+
+The coordinator built a way to run the actual built app in real Chromium with real
+Tesseract.js WASM from this sandbox, closing the gap both earlier rounds flagged.
+**I have adopted it and re-measured everything; some of my round-2 numbers were
+wrong.** Technique: `playwright-core` with `/opt/pw-browsers/chromium`, a
+`page.route()` shim that fulfils `cdn.jsdelivr.net` requests from
+`node_modules/tesseract.js{,-core}` and the cached `nor` language data, the built
+app served by `vite preview`, and the UI driven via `setInputFiles` on the capture
+inputs, reading results back out of the `?debug=1` panel.
+
+My harnesses (throwaway, in `scratchpad/ocrtest/`):
+
+| script | purpose |
+| --- | --- |
+| `batch.mjs` | drives the real app over a list of images, scores phone/name, reports passes and wall clock |
+| `browserlab.mjs` | runs preprocessing variants against real canvas + real WASM, for sweeps — the honest replacement for the Node/sharp lab |
+| `location-backfill.mjs` | proves the Finding 1 fix, with a deliberately delayed reverse-geocode |
+
+## 20. Finding 1 reproduced and fixed — location was gating the confirm screen
+
+Reproduced exactly as reported:
+
+```
+crop1 (flat sticker) — OCR succeeded on pass 1 in 273-314ms, and yet:
+  waited=4935ms   wall clock "Gå videre" -> confirm = 5395ms
+```
+
+`analyze()` did `Promise.all([withTimeout(ocr...), withTimeout(location...)])`, so
+the slower of the two gated the screen. Location can involve a permission prompt,
+a GPS fix and a reverse-geocode round trip — none of it under this app's control,
+and in headless Chromium `getCurrentPosition` simply never answers, so its
+`withTimeout` only gave up at the full budget. The operator's requirement is that
+5s is the **absolute maximum**, not a duration every run should take, so burning
+4.9s of it on a run that had the answer in 273ms violates the intent outright.
+
+**Fix:** only OCR gates the transition. `analyze()` takes `location.resolved` as-is
+(it is filled in by the lookup's own `.then`), leaves `Sted` blank if it has not
+landed, and `backfillLocation()` fills the field in — and refreshes the message via
+the existing `syncMeldingIfNotDirty` — when it arrives. The confirm screen keeps a
+small `confirmFields` handle so this happens without re-rendering the screen under
+the user. Anything the user has already typed wins, following the same rule as
+`meldingDirty`.
+
+Verified in the real browser with the reverse-geocode delayed 3s:
+
+```
+A. user does not type
+  confirm screen shown after 840ms   (reverse-geocode delayed 3000ms)
+  Sted immediately after confirm: ""
+  Telefon: "47239791"
+  Sted after location resolved:  "Solbakken, Bergen, Norge"
+  Melding: "Hei. Vi fant et gjenglemt plagg. Sted: Solbakken, Bergen, Norge. Navn: Anne/Nils Toftøy"
+
+B. user types "Skolen" into Sted first
+  confirm screen shown after 859ms
+  user typed "Skolen" into Sted
+  Sted after location resolved:  "Skolen"        <- not clobbered
+  Melding: "... Sted: Skolen. Navn: Anne/Nils Toftøy"
+```
+
+Across the 44-image set, wall clock from "Gå videre" to the confirm screen is now
+**median 919ms, max 4148ms** — previously a flat ~5395ms regardless of how fast OCR
+was.
+
+## 21. Finding 2 — why my Node model disagreed, and the real bug behind it
+
+Two separate things were going on, and only one of them was an app bug.
+
+### 21a. My Node model was testing a different image (my error, not a WASM difference)
+
+The suspected cause was that real WASM behaves differently from the Node binding.
+It does not. The divergence was in my own harness:
+
+```js
+// my Node lab
+sharp(file).resize({ width: 1280 })          // UPSCALES a 374px crop to 1280px
+
+// the shipped code, src/ocr.ts
+Math.min(1, pass.maxDim / Math.max(w, h))    // clamped — never upscales
+```
+
+`sharp`'s `resize()` enlarges by default. So for the small screenshot crops my lab
+handed Tesseract a 3.4x larger image than the app ever would, and reported
+successes the app could not reproduce. **Every round-2 accuracy number was
+inflated by this.** Re-measuring the round-2 code in the real browser gives
+**40/44**, not the 41/42 I reported.
+
+Two real consequences, both now fixed:
+
+- I have stopped using the Node/sharp lab. All numbers below are real-browser.
+- `preprocess()` now *may* upscale, up to 4x (`MAX_UPSCALE`). A real camera photo
+  is always far larger than any target so this never fires for one, but it means
+  small or cropped inputs get text at a size Tesseract can actually read — and it
+  removes this whole class of model/reality divergence.
+
+### 21b. The real bug — the orientation probes were blind on low-contrast images
+
+`crop2.png` failed with all 8 passes scoring 0, the two probes returning literally
+empty text. Swept in the browser lab at the correct orientation:
+
+```
+crop2.png  rot=90
+  dim= 640 gain=1                 score= 0 conf= 0       ""
+  dim=1280 gain=1                 score= 0 conf= 0       ""
+  dim=1600 gain=1                 score= 0 conf=37       "KE å Å; gs "
+  dim=1280 gain=1.8 bias=-60      score=23 conf=92 PHONE "Anne/Nils Toftøy 47239791 "
+```
+
+It is another low-contrast label. The pipeline *had* a contrast-boost pass — but
+only in refinement, at whichever orientation the probes chose, and **the probes ran
+plain**. So they scored 0 for both quarter turns, orientation stayed upright, and
+the boost then ran where it could not help. The orientation fallback was blind on
+exactly the images that most need it.
+
+Boosting the probes, measured over eight sideways cases in the real browser:
+
+| case | plain probe picks | boosted probe picks |
+| --- | --- | --- |
+| crop2.png | no signal (0/0) | **90** (score 23, reads whole label) |
+| C_bottle.png | 90 (score 6) | 90 (score 23) |
+| C_bottle_big.jpg | 90 (15) | 90 (23) |
+| adv_rot90_noexif.jpg | 90 (23) | 90 (23) |
+| side_90_0.4.jpg | 270 (23) | 270 (23) |
+| side_270_0.4.jpg | 90 (23) | 90 (22) |
+| side_90_0.25.jpg | no signal (0/0) | **270** (17) |
+| side_270_0.25.jpg | 90 (14) | 90 (17) |
+
+Plain 6/8, boosted **8/8** — and on several cases the boosted probe reads the whole
+label and finishes there, so it is often cheaper as well.
+
+## 22. A third bug the real harness exposed — confidently-wrong pass 1
+
+With the probes fixed, the remaining real-browser failures were two *wrong* phone
+numbers and two misses. Sweeping them:
+
+```
+res_3024.jpg   dim=1280 plain   score=22  "Anne/Nils Toftøy 3 7239791"   <- wrong digit, accepted
+res_3024.jpg   dim=1280 boosted score=23  "Anne/Nils Toftøy 47239791"    PHONE
+res_1563.jpg   dim=1280 plain   score=15  "Anne/Nils Toftøy 4725 .."     <- no number
+res_1563.jpg   dim=1280 boosted score=15  "Anne/Nils Toftøy 47239791"    PHONE
+```
+
+Whether plain or boosted reads the digit row correctly is image-dependent and not
+predictable, and getting it wrong on pass 1 is unrecoverable: the pass is
+*accepted* and the ladder stops. So stage 1 now runs **both** plain and boosted at
+1280 and takes whichever scored higher, and `runOcr` tracks `bestAccepted`
+separately from `bestAny` so a high-scoring pass that found no number can never
+outrank a pass that did.
+
+One extra recognition always runs. It costs nothing in practice, because the
+version without it usually had to reach refinement anyway: median wall clock
+919ms either way.
+
+## 23. `extract.ts` — one more fix from real output
+
+Real browser output for `syn_s2_near.jpg` was `"Ida Marie 0 Hauge 91234567"`. The
+bare `0` between the two name lines is not a phone candidate but it does contain a
+digit, and `isSpeckle` was protecting anything with a digit in it — so it split the
+name and we returned just `"Hauge"`. Now only a run of 4+ digits is protected; a
+lone stray digit is speckle like any other. Two tests added (20 in `extract.test.ts`).
+
+## 24. Round-3 results (real browser, 44 images)
+
+```
+phone-correct 42/44   WRONG 1   missing 1   name-exact 35/44
+passes: median 2   max 9
+waited: median 785ms   max 3800ms
+wall clock (Gå videre -> confirm): median 919ms   max 4148ms
+```
+
+Progression, all measured in the real browser on the same 44 images:
+
+| | phone correct | wrong | missing | name exact | median wall |
+| --- | --- | --- | --- | --- | --- |
+| round-2 code as shipped | 40/44 | 2 | 2 | 34/44 | ~5395ms (location-gated) |
+| round 3 | **42/44** | **1** | **1** | **35/44** | **919ms** |
+
+Fixed this round: `crop2.png`, `res_3024.jpg` (was a wrong number), `res_1563.jpg`
+(was a miss), `syn_s2_near.jpg` name, and the location-gated wait on every run.
+
+Still failing: `adv_skew12.jpg` (12 degrees of tilt, 9 passes, no number — no
+variant in the sweep read its digits) and `syn_s1_skew.jpg` (`98765435` for
+`98765432`, a single-digit misread on a deliberately skewed synthetic).
+
+Note: `adv_blur.jpg` logs leptonica warnings (`Error in boxClipToRectangle`) to the
+console. They are noise from Tesseract's own image handling, not app errors, and
+that case passes.
+
+## 25. The 5s budget, now with real numbers
+
+The extrapolation is gone. On this machine's Chromium, real WASM:
+
+- one 1280px pass: ~250-750ms
+- one 640px probe: ~50-280ms
+- stage 1 (two passes): ~700-1300ms
+- worst observed full ladder (9 recognitions): 4142ms of OCR
+
+So the budget holds with room to spare in the common case and is genuinely tight
+only in the deepest fallback. **I have still not changed the 5s number**, and now
+there is evidence it does not need changing. Two caveats worth stating: a phone's
+CPU is slower than this sandbox's, and the early-kickoff overlap plus the
+best-scoring partial fallback are what absorb that. The `?debug=1` panel remains in
+place precisely so a real-device run can confirm it.
+
+## 26. Remaining risk (round 3)
+
+- **Still not measured on the actual phone.** This is real Chromium on real WASM,
+  which is a large step up from round 2, but it is desktop-class hardware. The
+  ratio between this and an iPhone is unknown. `?debug=1` closes that.
+- **One wrong number remains**, and this class is the hardest: a single misread
+  digit inside an otherwise confident word passes both the score gate and the
+  plain-vs-boosted comparison. Cross-pass agreement was considered and rejected —
+  on `syn_s1_skew.jpg` two of three passes agree on the *wrong* number, so voting
+  would entrench it. The mandatory confirm screen remains load-bearing.
+- **Name accuracy is 35/44**, noticeably weaker than phone accuracy. Most misses
+  are a dropped first or last character (`"nne/Nils Toftøy"`, `"Anne/Nils"` without
+  the surname) on the synthetic sideways composites. These are character-level OCR
+  errors, not extraction logic.
+- **Tilt beyond ~10 degrees is still a real weakness** (`adv_skew12`), and the +/-12
+  degree passes do not reliably recover it.
+- **Test images remain mostly reconstructed**: 16 synthetic labels, plus derived
+  crops of two real photos. The genuinely-real-photo sample is still 3.
+- **Genuine cylindrical warp is still out of scope** — see section 17.

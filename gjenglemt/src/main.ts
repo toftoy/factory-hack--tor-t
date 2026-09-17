@@ -54,6 +54,23 @@ interface PendingOcr {
   partial: () => string;
 }
 
+/** A location lookup started early, plus its answer once it has arrived. */
+interface PendingLocation {
+  value: Promise<string | null>;
+  /** Null until it resolves, so `analyze()` can take it without waiting. */
+  resolved: string | null;
+}
+
+/**
+ * Handles on the confirm screen's live fields, so a late location can be filled
+ * in without re-rendering the screen out from under the user.
+ */
+interface ConfirmFields {
+  setSted: (value: string) => void;
+}
+
+let confirmFields: ConfirmFields | null = null;
+
 interface AppState {
   screen: Screen;
   photos: CapturedPhoto[];
@@ -61,7 +78,7 @@ interface AppState {
   /** Timestamp of the most recent capture, whichever photo it was. */
   lastCaptureAt: number;
   ocr: PendingOcr | null;
-  location: Promise<string | null> | null;
+  location: PendingLocation | null;
   navn: string;
   telefon: string;
   sted: string;
@@ -97,6 +114,8 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 
 function render(): void {
   app.innerHTML = '';
+  // The old confirm screen's inputs are gone; drop the handles to them.
+  confirmFields = null;
   if (state.screen === 'capture') {
     app.appendChild(renderCaptureScreen());
   } else if (state.screen === 'analyzing') {
@@ -158,9 +177,39 @@ function startNoteOcr(file: File): PendingOcr {
   return { text, partial: () => best };
 }
 
-/** Same trick for the garment photo's location lookup. */
-function startLocationLookup(file: File): Promise<string | null> {
-  return resolveLocation(file).catch(() => null);
+/**
+ * Same trick for the garment photo's location lookup, but its result is also
+ * recorded as it lands so the confirm screen never has to wait for it.
+ *
+ * Location can involve a permission prompt, a GPS fix and a reverse-geocode
+ * round trip, none of which this app controls, and it used to gate the confirm
+ * screen alongside OCR: a run where OCR had the right answer in 314ms still sat
+ * on the analysing screen for 4935ms because location never resolved. The 5s is
+ * an absolute ceiling for the worst case, not a duration every run should take.
+ */
+function startLocationLookup(file: File): PendingLocation {
+  const pending: PendingLocation = {
+    value: resolveLocation(file).catch(() => null),
+    resolved: null,
+  };
+  void pending.value.then((value) => {
+    pending.resolved = value;
+    backfillLocation(value);
+  });
+  return pending;
+}
+
+/**
+ * Fill in `Sted` once a slow location lookup finally lands.
+ *
+ * Follows the same rule as `meldingDirty`: anything the user has already put
+ * there wins, and we only ever fill a field that is still empty.
+ */
+function backfillLocation(value: string | null): void {
+  if (!value) return;
+  if (state.sted !== '') return;
+  state.sted = value;
+  confirmFields?.setSted(value);
 }
 
 function renderCaptureButton(role: PhotoRole): HTMLElement {
@@ -261,10 +310,10 @@ async function analyze(): Promise<void> {
   const budget = Math.max(0, RESULT_DEADLINE_MS - (Date.now() - state.lastCaptureAt));
   const waitStartedAt = Date.now();
 
-  const [ocrText, sted] = await Promise.all([
-    withTimeout(ocr.text, budget, null),
-    withTimeout(location, budget, null),
-  ]);
+  // Only OCR gates the screen. Location gets whatever time OCR happened to take
+  // and is then taken as-is; if it has not landed yet it keeps going and
+  // `backfillLocation` fills the field in when it does.
+  const ocrText = await withTimeout(ocr.text, budget, null);
 
   // TEMPORARY DIAGNOSTIC — see DEBUG.
   state.diagnostics.budgetMs = budget;
@@ -275,7 +324,7 @@ async function analyze(): Promise<void> {
 
   state.navn = name ?? '';
   state.telefon = phone ?? '';
-  state.sted = sted ?? '';
+  state.sted = location.resolved ?? '';
   state.melding = renderMessage({ navn: state.navn, sted: state.sted });
   state.meldingDirty = false;
   state.screen = 'confirm';
@@ -286,7 +335,7 @@ function labeledTextInput(
   labelText: string,
   value: string,
   onChange: (value: string) => void
-): HTMLLabelElement {
+): [HTMLLabelElement, HTMLInputElement] {
   const label = document.createElement('label');
   label.textContent = labelText;
   const input = document.createElement('input');
@@ -294,7 +343,7 @@ function labeledTextInput(
   input.value = value;
   input.addEventListener('input', () => onChange(input.value));
   label.appendChild(input);
-  return label;
+  return [label, input];
 }
 
 /**
@@ -384,23 +433,31 @@ function renderConfirmScreen(): HTMLElement {
     meldingTextarea.value = state.melding;
   }
 
-  container.appendChild(
-    labeledTextInput('Navn', state.navn, (value) => {
-      state.navn = value;
+  const [navnLabel] = labeledTextInput('Navn', state.navn, (value) => {
+    state.navn = value;
+    syncMeldingIfNotDirty();
+  });
+  container.appendChild(navnLabel);
+
+  const [telefonLabel] = labeledTextInput('Telefon', state.telefon, (value) => {
+    state.telefon = value;
+  });
+  container.appendChild(telefonLabel);
+
+  const [stedLabel, stedInput] = labeledTextInput('Sted', state.sted, (value) => {
+    state.sted = value;
+    syncMeldingIfNotDirty();
+  });
+  container.appendChild(stedLabel);
+
+  // Let a location lookup that is still running fill this in when it lands,
+  // instead of the confirm screen waiting for it.
+  confirmFields = {
+    setSted: (value) => {
+      stedInput.value = value;
       syncMeldingIfNotDirty();
-    })
-  );
-  container.appendChild(
-    labeledTextInput('Telefon', state.telefon, (value) => {
-      state.telefon = value;
-    })
-  );
-  container.appendChild(
-    labeledTextInput('Sted', state.sted, (value) => {
-      state.sted = value;
-      syncMeldingIfNotDirty();
-    })
-  );
+    },
+  };
 
   container.appendChild(meldingLabel);
 

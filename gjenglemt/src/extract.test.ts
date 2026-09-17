@@ -94,6 +94,19 @@ describe('extractNameAndPhone', () => {
     );
   });
 
+  it('treats a lone stray digit between name lines as speckle', () => {
+    // Real browser OCR output for one of the test labels was
+    // "Ida Marie / 0 / Hauge / 91234567" — the bare "0" used to split the name.
+    expect(extractNameAndPhone('Ida Marie\n0\nHauge\n91234567')).toEqual({
+      name: 'Ida Marie Hauge',
+      phone: '91234567',
+    });
+  });
+
+  it('still keeps a mangled digit run as a phone candidate', () => {
+    expect(extractNameAndPhone('Per Persem\n9988 7766').phone).toBe('99887766');
+  });
+
   it('strips leading and trailing OCR speckle from the name', () => {
     expect(extractNameAndPhone('! Anne/Nils |\nToftøy\n47239791').name).toBe(
       'Anne/Nils Toftøy'
