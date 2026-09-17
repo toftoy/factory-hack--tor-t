@@ -203,10 +203,10 @@ function startNoteOcr(file: File): PendingOcr {
  * on the analysing screen for 4935ms because location never resolved. The 5s is
  * an absolute ceiling for the worst case, not a duration every run should take.
  */
-function startLocationLookup(file: File): PendingLocation {
+function startLocationLookup(): PendingLocation {
   state.diagnostics.locationStartedAt = Date.now();
   const pending: PendingLocation = {
-    value: resolveLocation(file, sessionLiveCoords).catch(() => null),
+    value: resolveLocation(sessionLiveCoords).catch(() => null),
     resolved: null,
     settled: false,
   };
@@ -291,7 +291,7 @@ function renderCaptureButton(): HTMLElement {
     state.photo = file;
     state.lastCaptureAt = Date.now();
     state.ocr = startNoteOcr(file);
-    state.location = startLocationLookup(file);
+    state.location = startLocationLookup();
     hasCapturedBefore = true;
     state.screen = 'analyzing';
     render();
@@ -359,7 +359,7 @@ async function analyze(): Promise<void> {
   // Both jobs were started at capture time; only pick them up here. Whatever is
   // left of the 5s budget since the shutter is all the extra time they get.
   const ocr = state.ocr ?? startNoteOcr(photo);
-  const location = state.location ?? (state.location = startLocationLookup(photo));
+  const location = state.location ?? (state.location = startLocationLookup());
   const budget = Math.max(0, RESULT_DEADLINE_MS - (Date.now() - state.lastCaptureAt));
   const waitStartedAt = Date.now();
 

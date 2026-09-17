@@ -1,5 +1,3 @@
-import exifr from 'exifr';
-
 export interface Coords {
   lat: number;
   lng: number;
@@ -20,14 +18,6 @@ export function buildNominatimUrl(lat: number, lng: number): string {
 
 export function parseNominatimResponse(response: NominatimResponse | null): string | null {
   return response?.display_name?.trim() || null;
-}
-
-export async function getExifCoords(file: File): Promise<Coords | null> {
-  const gps = await exifr.gps(file).catch(() => null);
-  if (!gps || typeof gps.latitude !== 'number' || typeof gps.longitude !== 'number') {
-    return null;
-  }
-  return { lat: gps.latitude, lng: gps.longitude };
 }
 
 export function getLiveCoords(): Promise<Coords | null> {
@@ -67,12 +57,16 @@ export async function reverseGeocode(coords: Coords): Promise<string | null> {
  * a permission prompt and GPS fix per item is not something the OS lets a web
  * app skip, so the app avoids repeating it by reusing one fix for the whole
  * session instead.
+ *
+ * EXIF was dropped as a source: it only resolves after the photo is taken
+ * (adding latency the pre-fetched live fix doesn't have) and iOS Safari is
+ * known to strip GPS metadata from photos taken via `<input capture>` anyway,
+ * so it bought little over just using the live fix directly.
  */
 export async function resolveLocation(
-  notePhoto: File,
   liveCoords: Promise<Coords | null> = getLiveCoords()
 ): Promise<string | null> {
-  const coords = (await getExifCoords(notePhoto)) ?? (await liveCoords);
+  const coords = await liveCoords;
   if (!coords) return null;
   return reverseGeocode(coords);
 }

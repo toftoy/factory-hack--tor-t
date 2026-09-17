@@ -2,11 +2,11 @@
 
 En liten mobilvennlig webapp som hjelper med å varsle eiere av
 gjenglemte klær/ting. Ta bilde av en lapp med navn/telefon, så gjetter
-appen navn, telefon og finnested (fra bildets posisjon, eller fra
-telefonens live GPS som reserve), lar deg rette gjetningene, og åpner
-Meldinger direkte i riktig samtale med teksten ferdig utfylt. Bildet av
-plagget/tingen tas ikke gjennom appen — det tas rett i samtalen som
-åpner seg, siden det uansett må legges ved manuelt.
+appen navn og telefon fra bildet og finnested fra telefonens GPS (hentet
+i forkant, gjenbrukt for hele økten), lar deg rette gjetningene, og
+åpner Meldinger direkte i riktig samtale med teksten ferdig utfylt.
+Bildet av plagget/tingen tas ikke gjennom appen — det tas rett i
+samtalen som åpner seg, siden det uansett må legges ved manuelt.
 
 Se designdokumentet i
 `../docs/superpowers/specs/2026-09-15-gjenglemt-design.md` for
@@ -79,9 +79,10 @@ utviklingsomgivelsen:
       bildet er tatt, uten noen "Gå videre"-knapp å trykke
 - [ ] OCR klarer å lese et vanlig håndskrevet/trykt navn og
       telefonnummer fra lappen
-- [ ] Finnested fylles ut automatisk (enten fra lapp-bildets
-      EXIF-posisjon, eller fra telefonens live GPS som fallback —
-      "Henter sted …" vises i feltet mens det pågår)
+- [ ] Finnested fylles ut automatisk fra telefonens GPS (hentet med én
+      gang appen lastes) — "Henter sted …" vises i feltet mens det
+      pågår, og feltet fylles inn kort tid etter at meldingsskjermen
+      vises
 - [ ] "Åpne melding"-knappen åpner Meldinger direkte i riktig samtale
       med teksten ferdig utfylt (ikke en generisk delingsmeny)
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
@@ -89,9 +90,8 @@ utviklingsomgivelsen:
 - [ ] "Nytt funn" på meldingsskjermen fører deg tilbake til kameraet
       for neste gjenstand uten å be om posisjonstillatelse på nytt
 - [ ] "Legg til på Hjem-skjerm" viser riktig ikon og navn
-- [ ] Sjekk om Sted faktisk fylles ut fra bildets EXIF-posisjon på
-      iPhone, eller om appen alltid faller tilbake til å be om
-      live posisjonstilgang i stedet (iOS Safari er kjent for av og
-      til å fjerne posisjonsmetadata fra bilder tatt via
-      `<input type="file">`, så fallback-veien kan i praksis være
-      vanligste tilfelle, ikke unntaket)
+- [ ] Kom tilbake til appen etter et kamera-opptak og bekreft at du
+      havner i meldingsskjermen, ikke tilbake på forsiden — iOS er
+      kjent for av og til å laste en hjemskjerm-installert side helt på
+      nytt (og dermed miste JS-tilstanden) når kameraet lukkes, særlig
+      under minnepress

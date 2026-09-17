@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import exifr from 'exifr';
 import { buildNominatimUrl, parseNominatimResponse, resolveLocation } from './location';
-
-vi.mock('exifr', () => ({ default: { gps: vi.fn() } }));
 
 describe('buildNominatimUrl', () => {
   it('builds a reverse-geocode URL with the coordinates', () => {
@@ -26,8 +23,6 @@ describe('parseNominatimResponse', () => {
 });
 
 describe('resolveLocation', () => {
-  const file = new File([''], 'note.jpg', { type: 'image/jpeg' });
-
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
@@ -44,17 +39,7 @@ describe('resolveLocation', () => {
     delete (navigator as unknown as Record<string, unknown>).geolocation;
   });
 
-  it('uses EXIF GPS coordinates when present', async () => {
-    vi.mocked(exifr.gps).mockResolvedValue({ latitude: 59.91, longitude: 10.75 });
-
-    const result = await resolveLocation(file);
-
-    expect(result).toBe('Storgata 1, Oslo');
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('lat=59.91'), expect.anything());
-  });
-
-  it('falls back to live geolocation when EXIF has no GPS data', async () => {
-    vi.mocked(exifr.gps).mockResolvedValue(undefined as any);
+  it('resolves via live geolocation when no coords promise is supplied', async () => {
     Object.defineProperty(navigator, 'geolocation', {
       value: {
         getCurrentPosition: (success: PositionCallback) =>
@@ -63,7 +48,7 @@ describe('resolveLocation', () => {
       configurable: true,
     });
 
-    const result = await resolveLocation(file);
+    const result = await resolveLocation();
 
     expect(result).toBe('Storgata 1, Oslo');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('lat=63.43'), expect.anything());
@@ -73,17 +58,15 @@ describe('resolveLocation', () => {
     // Simulates the app-level cache: a live GPS fix requested once at app
     // startup and reused for every item, rather than re-requested (and
     // re-consented to) per photo.
-    vi.mocked(exifr.gps).mockResolvedValue(undefined as any);
     const sessionCoords = Promise.resolve({ lat: 1.23, lng: 4.56 });
 
-    const result = await resolveLocation(file, sessionCoords);
+    const result = await resolveLocation(sessionCoords);
 
     expect(result).toBe('Storgata 1, Oslo');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('lat=1.23'), expect.anything());
   });
 
-  it('returns null when neither EXIF nor live location is available', async () => {
-    vi.mocked(exifr.gps).mockResolvedValue(undefined as any);
+  it('returns null when live location is unavailable', async () => {
     Object.defineProperty(navigator, 'geolocation', {
       value: {
         getCurrentPosition: (_success: PositionCallback, error: PositionErrorCallback) =>
@@ -92,7 +75,7 @@ describe('resolveLocation', () => {
       configurable: true,
     });
 
-    const result = await resolveLocation(file);
+    const result = await resolveLocation();
 
     expect(result).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
