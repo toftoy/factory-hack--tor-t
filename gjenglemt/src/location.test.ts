@@ -26,7 +26,7 @@ describe('parseNominatimResponse', () => {
 });
 
 describe('resolveLocation', () => {
-  const file = new File([''], 'garment.jpg', { type: 'image/jpeg' });
+  const file = new File([''], 'note.jpg', { type: 'image/jpeg' });
 
   beforeEach(() => {
     vi.stubGlobal(
@@ -67,6 +67,19 @@ describe('resolveLocation', () => {
 
     expect(result).toBe('Storgata 1, Oslo');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('lat=63.43'), expect.anything());
+  });
+
+  it('uses a supplied live-coords promise instead of requesting a fresh one', async () => {
+    // Simulates the app-level cache: a live GPS fix requested once at app
+    // startup and reused for every item, rather than re-requested (and
+    // re-consented to) per photo.
+    vi.mocked(exifr.gps).mockResolvedValue(undefined as any);
+    const sessionCoords = Promise.resolve({ lat: 1.23, lng: 4.56 });
+
+    const result = await resolveLocation(file, sessionCoords);
+
+    expect(result).toBe('Storgata 1, Oslo');
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('lat=1.23'), expect.anything());
   });
 
   it('returns null when neither EXIF nor live location is available', async () => {

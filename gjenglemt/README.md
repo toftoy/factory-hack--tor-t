@@ -1,11 +1,12 @@
 # gjenglemt
 
 En liten mobilvennlig webapp som hjelper med å varsle eiere av
-gjenglemte klær. Ta bilde av en lapp med navn/telefon og bilde av
-plagget, så gjetter appen navn, telefon og finnested (fra bildets
-posisjon), lar deg rette gjetningene, og åpner telefonens delingsmeny
-med bildene og en ferdig meldingstekst — du velger selv å sende via
-Meldinger.
+gjenglemte klær/ting. Ta bilde av en lapp med navn/telefon, så gjetter
+appen navn, telefon og finnested (fra bildets posisjon, eller fra
+telefonens live GPS som reserve), lar deg rette gjetningene, og åpner
+Meldinger direkte i riktig samtale med teksten ferdig utfylt. Bildet av
+plagget/tingen tas ikke gjennom appen — det tas rett i samtalen som
+åpner seg, siden det uansett må legges ved manuelt.
 
 Se designdokumentet i
 `../docs/superpowers/specs/2026-09-15-gjenglemt-design.md` for
@@ -44,7 +45,7 @@ npm run preview
 ## Teste
 
 ```bash
-npm test    # enhetstester (vitest) for tekstuttrekk, meldingsmal, deling, sted og capture-flow-tilstand
+npm test    # enhetstester (vitest) for tekstuttrekk, meldingsmal, deling og sted
 npm run smoke   # headless sjekk av at appen laster (playwright)
 ```
 
@@ -72,19 +73,21 @@ Følgende må sjekkes på en ekte iPhone og Android-telefon før bruk,
 siden de avhenger av ekte kamera/GPS/deling som ikke finnes i denne
 utviklingsomgivelsen:
 
-- [ ] Kameraet åpner seg direkte når du trykker en "Ta bilde"-knapp,
+- [ ] Kameraet åpner seg direkte når du trykker "Ta bilde av lappen",
       på både iOS Safari og Android Chrome
-- [ ] Bildeflyten går automatisk videre fra lapp → plagg → (evt.
-      ekstra) uten at du må velge hvilket bilde som er hva
+- [ ] Appen går automatisk videre til meldingsskjermen så snart lapp-
+      bildet er tatt, uten noen "Gå videre"-knapp å trykke
 - [ ] OCR klarer å lese et vanlig håndskrevet/trykt navn og
       telefonnummer fra lappen
-- [ ] Finnested fylles ut automatisk (enten fra bildets
-      EXIF-posisjon, eller ved at nettleseren spør om
-      posisjonstilgang som fallback)
-- [ ] "Send"-knappen åpner delingsmenyen med begge bildene og teksten
-      ferdig utfylt, og Meldinger-appen dukker opp som et alternativ
+- [ ] Finnested fylles ut automatisk (enten fra lapp-bildets
+      EXIF-posisjon, eller fra telefonens live GPS som fallback —
+      "Henter sted …" vises i feltet mens det pågår)
+- [ ] "Åpne melding"-knappen åpner Meldinger direkte i riktig samtale
+      med teksten ferdig utfylt (ikke en generisk delingsmeny)
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
       fylle inn Sted manuelt uten å henge seg opp
+- [ ] "Nytt funn" på meldingsskjermen fører deg tilbake til kameraet
+      for neste gjenstand uten å be om posisjonstillatelse på nytt
 - [ ] "Legg til på Hjem-skjerm" viser riktig ikon og navn
 - [ ] Sjekk om Sted faktisk fylles ut fra bildets EXIF-posisjon på
       iPhone, eller om appen alltid faller tilbake til å be om

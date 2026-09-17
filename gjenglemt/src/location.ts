@@ -61,8 +61,18 @@ export async function reverseGeocode(coords: Coords): Promise<string | null> {
   return parseNominatimResponse(json);
 }
 
-export async function resolveLocation(garmentPhoto: File): Promise<string | null> {
-  const coords = (await getExifCoords(garmentPhoto)) ?? (await getLiveCoords());
+/**
+ * `liveCoords` defaults to a fresh request, but the caller normally passes in
+ * a live GPS fix requested once at app startup and shared across every item —
+ * a permission prompt and GPS fix per item is not something the OS lets a web
+ * app skip, so the app avoids repeating it by reusing one fix for the whole
+ * session instead.
+ */
+export async function resolveLocation(
+  notePhoto: File,
+  liveCoords: Promise<Coords | null> = getLiveCoords()
+): Promise<string | null> {
+  const coords = (await getExifCoords(notePhoto)) ?? (await liveCoords);
   if (!coords) return null;
   return reverseGeocode(coords);
 }

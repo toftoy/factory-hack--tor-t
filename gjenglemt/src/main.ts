@@ -1,20 +1,18 @@
 import './styles.css';
-import type { CapturedPhoto, PhotoRole } from './types';
-import { nextCaptureRole, canProceed } from './capture';
 import { runOcr, warmUpOcr, type OcrPassReport, type OcrResult } from './ocr';
 import { extractNameAndPhone } from './extract';
-import { resolveLocation } from './location';
+import { resolveLocation, getLiveCoords, type Coords } from './location';
 import { renderMessage } from './template';
 import { buildSmsLink } from './share';
 
 type Screen = 'capture' | 'analyzing' | 'confirm';
 
 /**
- * Hard budget between the shutter for the *last* photo and the confirm screen.
+ * Hard budget between the shutter and the confirm screen.
  *
- * Recognition is started the moment a photo is captured (see `startNoteOcr` and
- * `startLocationLookup`) so that it overlaps the user taking their next photo
- * and tapping through. This deadline is what is left of the budget by the time
+ * Recognition is started the moment the photo is captured (see `startNoteOcr`
+ * and `startLocationLookup`) so it overlaps whatever render/analyze plumbing
+ * runs next. This deadline is what is left of the budget by the time
  * `analyze()` actually runs; anything still unfinished is dropped so the confirm
  * screen never makes the user wait.
  */
@@ -50,6 +48,20 @@ interface Diagnostics {
   locationValue: string | null;
 }
 
+function emptyDiagnostics(): Diagnostics {
+  return {
+    passes: [],
+    noteCapturedAt: 0,
+    ocrSettledAt: 0,
+    budgetMs: 0,
+    waitedMs: 0,
+    deadlineHit: false,
+    locationStartedAt: 0,
+    locationSettledAt: 0,
+    locationValue: null,
+  };
+}
+
 /** A recognition job started early, plus whatever partial text it has produced. */
 interface PendingOcr {
   result: Promise<OcrResult>;
@@ -78,10 +90,25 @@ interface ConfirmFields {
 
 let confirmFields: ConfirmFields | null = null;
 
+/**
+ * True once the intro pitch has been shown, so a "Nytt funn" reset (see
+ * `renderConfirmScreen`) returns straight to the camera instead of repeating
+ * the pitch for someone already partway through sorting several items.
+ */
+let hasCapturedBefore = false;
+
+/**
+ * A live GPS fix, requested once when the app loads and reused for every item
+ * captured in this session — see `resolveLocation`. A permission prompt and GPS
+ * fix per item is not something the OS lets a web app skip, so the app avoids
+ * repeating it rather than trying to work around it.
+ */
+const sessionLiveCoords: Promise<Coords | null> = getLiveCoords();
+
 interface AppState {
   screen: Screen;
-  photos: CapturedPhoto[];
-  /** Timestamp of the most recent capture, whichever photo it was. */
+  photo: File | null;
+  /** Timestamp of the capture. */
   lastCaptureAt: number;
   ocr: PendingOcr | null;
   location: PendingLocation | null;
@@ -96,7 +123,7 @@ interface AppState {
 
 const state: AppState = {
   screen: 'capture',
-  photos: [],
+  photo: null,
   lastCaptureAt: 0,
   ocr: null,
   location: null,
@@ -105,17 +132,7 @@ const state: AppState = {
   sted: '',
   melding: '',
   meldingDirty: false,
-  diagnostics: {
-    passes: [],
-    noteCapturedAt: 0,
-    ocrSettledAt: 0,
-    budgetMs: 0,
-    waitedMs: 0,
-    deadlineHit: false,
-    locationStartedAt: 0,
-    locationSettledAt: 0,
-    locationValue: null,
-  },
+  diagnostics: emptyDiagnostics(),
 };
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
@@ -133,27 +150,9 @@ function render(): void {
   }
 }
 
-function labelForRole(role: PhotoRole): string {
-  switch (role) {
-    case 'note':
-      return 'Ta bilde av lappen';
-    case 'garment':
-      return 'Ta bilde av plagget/tingen';
-  }
-}
-
-function nounForRole(role: PhotoRole): string {
-  switch (role) {
-    case 'note':
-      return 'lappen';
-    case 'garment':
-      return 'plagget/tingen';
-  }
-}
-
 /**
- * Start OCR on the note photo immediately, so it runs while the user is still
- * taking the next photo instead of after they tap through.
+ * Start OCR on the photo immediately, so it runs while the rest of the
+ * analyze/render plumbing catches up instead of after the fact.
  *
  * `runOcr` works through a ladder of preprocessing passes and asks this
  * predicate after each one whether the text is good enough to stop. We treat
@@ -195,8 +194,8 @@ function startNoteOcr(file: File): PendingOcr {
 }
 
 /**
- * Same trick for the garment photo's location lookup, but its result is also
- * recorded as it lands so the confirm screen never has to wait for it.
+ * Same trick for the location lookup, but its result is also recorded as it
+ * lands so the confirm screen never has to wait for it.
  *
  * Location can involve a permission prompt, a GPS fix and a reverse-geocode
  * round trip, none of which this app controls, and it used to gate the confirm
@@ -207,7 +206,7 @@ function startNoteOcr(file: File): PendingOcr {
 function startLocationLookup(file: File): PendingLocation {
   state.diagnostics.locationStartedAt = Date.now();
   const pending: PendingLocation = {
-    value: resolveLocation(file).catch(() => null),
+    value: resolveLocation(file, sessionLiveCoords).catch(() => null),
     resolved: null,
     settled: false,
   };
@@ -239,45 +238,6 @@ function backfillLocation(value: string | null): void {
   confirmFields?.setSted(value);
 }
 
-function renderCaptureButton(role: PhotoRole): HTMLElement {
-  const wrapper = document.createElement('div');
-
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment';
-  input.hidden = true;
-  input.addEventListener('change', () => {
-    const file = input.files?.[0];
-    if (file) {
-      state.photos.push({ role, file });
-      state.lastCaptureAt = Date.now();
-      if (role === 'note') state.ocr = startNoteOcr(file);
-      if (role === 'garment') state.location = startLocationLookup(file);
-      render();
-    }
-  });
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = labelForRole(role);
-  button.addEventListener('click', () => input.click());
-
-  wrapper.append(button, input);
-
-  // Every OCR failure left after round 4 came down to the label being rotated in
-  // the frame, and unlike a curved or shiny surface the user can fix that for
-  // free by turning the phone. Only worth saying for the note photo.
-  if (role === 'note') {
-    const hint = document.createElement('p');
-    hint.className = 'hint';
-    hint.textContent = 'Tips: hold telefonen slik at teksten på lappen står vannrett.';
-    wrapper.appendChild(hint);
-  }
-
-  return wrapper;
-}
-
 /**
  * Short pitch shown before the first photo is taken, explaining what the app
  * is for and how it works. Gone once capture starts so it doesn't clutter the
@@ -304,9 +264,9 @@ function renderIntro(): HTMLElement {
   const steps = document.createElement('ol');
   for (const step of [
     'Ta bilde av lappen med navn og telefonnummer',
-    'Ta bilde av plagget/tingen',
     'Sjekk at navn, telefon og sted stemmer',
     'Åpne meldingen og send den',
+    'Ta bilde av plagget/tingen i meldingen og send det',
   ]) {
     const item = document.createElement('li');
     item.textContent = step;
@@ -317,31 +277,55 @@ function renderIntro(): HTMLElement {
   return intro;
 }
 
+function renderCaptureButton(): HTMLElement {
+  const wrapper = document.createElement('div');
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.hidden = true;
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    state.photo = file;
+    state.lastCaptureAt = Date.now();
+    state.ocr = startNoteOcr(file);
+    state.location = startLocationLookup(file);
+    hasCapturedBefore = true;
+    state.screen = 'analyzing';
+    render();
+    void analyze();
+  });
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'primary';
+  button.textContent = 'Ta bilde av lappen';
+  button.addEventListener('click', () => input.click());
+
+  wrapper.append(button, input);
+
+  // Every OCR failure left after round 4 came down to the label being rotated in
+  // the frame, and unlike a curved or shiny surface the user can fix that for
+  // free by turning the phone.
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = 'Tips: hold telefonen slik at teksten på lappen står vannrett.';
+  wrapper.appendChild(hint);
+
+  return wrapper;
+}
+
 function renderCaptureScreen(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'screen screen-capture';
 
-  if (state.photos.length === 0) {
+  if (!hasCapturedBefore) {
     container.appendChild(renderIntro());
   }
 
-  const role = nextCaptureRole(state.photos);
-  if (role) {
-    container.appendChild(renderCaptureButton(role));
-  }
-
-  if (canProceed(state.photos)) {
-    const proceed = document.createElement('button');
-    proceed.type = 'button';
-    proceed.className = 'primary';
-    proceed.textContent = 'Gå videre';
-    proceed.addEventListener('click', () => {
-      state.screen = 'analyzing';
-      render();
-      void analyze();
-    });
-    container.appendChild(proceed);
-  }
+  container.appendChild(renderCaptureButton());
 
   return container;
 }
@@ -349,7 +333,7 @@ function renderCaptureScreen(): HTMLElement {
 function renderAnalyzingScreen(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'screen screen-analyzing';
-  container.textContent = 'Analyserer bilder …';
+  container.textContent = 'Analyserer bilde …';
   return container;
 }
 
@@ -370,13 +354,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
 }
 
 async function analyze(): Promise<void> {
-  const notePhoto = state.photos.find((p) => p.role === 'note')!;
-  const garmentPhoto = state.photos.find((p) => p.role === 'garment')!;
+  const photo = state.photo!;
 
   // Both jobs were started at capture time; only pick them up here. Whatever is
-  // left of the 5s budget since the last shutter is all the extra time they get.
-  const ocr = state.ocr ?? startNoteOcr(notePhoto.file);
-  const location = state.location ?? (state.location = startLocationLookup(garmentPhoto.file));
+  // left of the 5s budget since the shutter is all the extra time they get.
+  const ocr = state.ocr ?? startNoteOcr(photo);
+  const location = state.location ?? (state.location = startLocationLookup(photo));
   const budget = Math.max(0, RESULT_DEADLINE_MS - (Date.now() - state.lastCaptureAt));
   const waitStartedAt = Date.now();
 
@@ -446,8 +429,7 @@ function renderDebugPanel(): HTMLElement {
   const lines = [
     `deadlineHit=${deadlineHit}  budget=${budgetMs}ms  waited=${waitedMs}ms`,
     `passes=${passes.length}  ocrTime=${totalOcrMs}ms` +
-      `  noteShutter->ocrDone=${ocrSettledAt ? ocrSettledAt - noteCapturedAt : -1}ms` +
-      `  noteShutter->lastShutter=${state.lastCaptureAt - noteCapturedAt}ms`,
+      `  shutter->ocrDone=${ocrSettledAt ? ocrSettledAt - noteCapturedAt : -1}ms`,
     `sted: ${locationSettledAt ? `settled after ${locationSettledAt - locationStartedAt}ms` : locationStartedAt ? 'still pending' : 'not started'}` +
       `  value=${JSON.stringify(locationValue)}`,
     `ua=${navigator.userAgent}`,
@@ -493,15 +475,15 @@ function renderConfirmScreen(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'screen screen-confirm';
 
-  const thumbs = document.createElement('div');
-  thumbs.className = 'thumbnails';
-  for (const photo of state.photos) {
+  if (state.photo) {
+    const thumbs = document.createElement('div');
+    thumbs.className = 'thumbnails';
     const img = document.createElement('img');
-    img.src = URL.createObjectURL(photo.file);
-    img.alt = nounForRole(photo.role);
+    img.src = URL.createObjectURL(state.photo);
+    img.alt = 'lappen';
     thumbs.appendChild(img);
+    container.appendChild(thumbs);
   }
-  container.appendChild(thumbs);
 
   const meldingLabel = document.createElement('label');
   meldingLabel.textContent = 'Melding';
@@ -568,31 +550,41 @@ function renderConfirmScreen(): HTMLElement {
   status.hidden = true;
   container.appendChild(status);
 
-  // TEMPORARY DIAGNOSTIC — see DEBUG.
-  if (DEBUG) container.appendChild(renderDebugPanel());
-
   // Opens Meldinger directly in the right conversation, text pre-filled — see
   // buildSmsLink for why this is the primary path rather than navigator.share.
-  // Photos can't be attached this way, so they're offered as a manual
-  // follow-up: the conversation is already open and correctly addressed, so
-  // attaching a photo there is a couple of taps.
+  // The lapp photo was only ever for reading name/telefon/sted, not meant to be
+  // shared, so nothing is attached automatically here: the user takes a fresh
+  // photo of the item straight in that conversation instead.
   sendButton.addEventListener('click', () => {
     window.location.href = buildSmsLink(state.telefon, state.melding, navigator.userAgent);
 
     status.hidden = false;
-    status.innerHTML = '';
-    const note = document.createElement('p');
-    note.textContent = 'Legg ved bildene i samtalen som åpner seg:';
-    status.appendChild(note);
-
-    for (const photo of state.photos) {
-      const download = document.createElement('a');
-      download.href = URL.createObjectURL(photo.file);
-      download.download = photo.file.name || `${photo.role}.jpg`;
-      download.textContent = `Last ned bilde av ${nounForRole(photo.role)}`;
-      status.appendChild(download);
-    }
+    status.textContent = 'Ta bilde av plagget/tingen i samtalen som åpner seg, og send det.';
   });
+
+  const newFind = document.createElement('button');
+  newFind.type = 'button';
+  newFind.textContent = 'Nytt funn';
+  // Resets everything about this item but keeps `sessionLiveCoords`, so the
+  // next item's location lookup reuses the same GPS fix instead of asking for
+  // permission and a fix all over again.
+  newFind.addEventListener('click', () => {
+    state.screen = 'capture';
+    state.photo = null;
+    state.ocr = null;
+    state.location = null;
+    state.navn = '';
+    state.telefon = '';
+    state.sted = '';
+    state.melding = '';
+    state.meldingDirty = false;
+    state.diagnostics = emptyDiagnostics();
+    render();
+  });
+  container.appendChild(newFind);
+
+  // TEMPORARY DIAGNOSTIC — see DEBUG.
+  if (DEBUG) container.appendChild(renderDebugPanel());
 
   return container;
 }
