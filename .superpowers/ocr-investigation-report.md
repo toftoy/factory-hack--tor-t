@@ -960,3 +960,300 @@ place precisely so a real-device run can confirm it.
 - **Test images remain mostly reconstructed**: 16 synthetic labels, plus derived
   crops of two real photos. The genuinely-real-photo sample is still 3.
 - **Genuine cylindrical warp is still out of scope** — see section 17.
+
+---
+---
+
+# Round 4 — architecture and limits analysis (no code changes)
+
+This section is an analysis of where the current approach's ceiling actually is,
+not a fix report. No committed source files were changed. All measurements are
+from the real-browser harness (real Chromium, real Tesseract.js WASM); the scratch
+scripts are `scratchpad/ocrtest/lab2.mjs` (adds per-run PSM, character whitelist,
+per-character confidence, bounding boxes, and a cylindrical unwarp) and
+`scratchpad/ocrtest/skewest.mjs`.
+
+## 27. The premise was wrong: this is not curvature or glare
+
+The new bottle photo was described as genuine cylindrical warp plus specular
+glare. Zooming into the label's own text region says otherwise. The digits
+`47239791` are complete, unbroken, well separated, dark on a pale blue sticker,
+with no highlight crossing them and no visible foreshortening — the label sits on
+the near, flat-facing part of the bottle. What is actually there is an in-plane
+rotation of roughly 11 degrees and a little softness.
+
+Three independent measurements confirm rotation is the operative variable:
+
+**1. A fine rotation sweep reads it correctly at most angles.** 1280px, contrast
+boosted, digit whitelist, one degree steps:
+
+```
+rot  -18 -16 -14 -13 -12 -11 -10  -9  -8  -7  -6  -5  -4  -2   0
+      ok  ok  ok  --   X   ok  X   ok  ok  ok  X   ok  ok  ok  (partial)
+```
+
+Ten of fifteen angles produce exactly `47239791`. The failures are `-12` →
+`47250781`, `-6` → `47239794`, `-10` → `7239701`, and `-13` → nothing.
+
+**The shipped ladder's only rotated attempts are -12 and +12.** `-12` is one of
+the four angles that fail, and it produces `47250781` — precisely the wrong number
+the harness reported. The pipeline did not hit a ceiling on this image; it landed
+on an unlucky grid point.
+
+**2. Cylindrical unwarp changes nothing.** I implemented a horizontal cylindrical
+re-sampling and swept its strength:
+
+```
+unwarp      0.0   0.3   0.5   0.7   0.9
+rot=0     4723 979 (incomplete at every strength)
+rot=-8    47239791 ok at every strength
+```
+
+Rotation decides the outcome; the unwarp is irrelevant. If curvature were the
+limiting distortion this would not be true.
+
+**3. The two failing runs disagreed with each other.** The device run gave
+`47239794`, the harness run `47250781`. A fixed physical defect in the image would
+produce the same error twice. Two different errors mean the *pipeline* is unstable,
+not the image.
+
+Note also that the failing angles are not a contiguous band — `-12` and `-10` and
+`-6` fail while their immediate neighbours succeed. So the sensitivity is not a
+smooth function of angle that could be solved by estimating the angle precisely.
+Tesseract's line segmentation on soft, sparse, rotated text is **chaotic**: small
+input perturbations flip the result.
+
+## 28. Where the remaining errors actually cluster
+
+Taking the round-3 real-browser run over 44 images plus this new photo, and
+attributing each residual failure:
+
+| cause | status |
+| --- | --- |
+| resolution / sensor noise | solved in round 1 (downscale) |
+| low contrast | solved in round 3 (paired plain + boosted passes) |
+| quarter-turn orientation | solved in round 3 (boosted probes, 8/8) |
+| **in-plane rotation, roughly 4 to 15 degrees** | **every remaining phone-number failure** |
+| curvature / glare | not observed as a cause in any failing case so far |
+
+The residual set is `adv_skew12` (12 degrees, miss), `syn_s1_skew` (9 degrees,
+wrong number), `crop3` (11 degrees, wrong number), and `adv_skew7`'s dropped name
+character. That is the whole tail, and it is one cause.
+
+So in the proportions asked for: this is **not** an engine-capability ceiling and
+**not** a capture-condition problem. It is an artefact of covering a continuous
+nuisance parameter with a two-point grid, made worse by the engine's instability
+under that parameter.
+
+## 29. Working through the proposed techniques, with measurements
+
+### Digit whitelist — helps, and is cheap
+
+Constraining the alphabet to `0123456789` is clearly useful. At rot=0 the general
+pass returns `"== — ar; ? 4723 ftøy Fr 979"`; the whitelisted pass returns
+`"4723 979"` at confidence 96 — same digits, none of the surrounding garbage, and
+notably it does not hallucinate digits to fill the gap. It cost roughly the same
+per pass (~300-400ms). Worth having as a *separate* digit-hunting pass, not as a
+replacement for the general pass, because the name still needs the full alphabet.
+
+### Per-character confidence weighting — does not work
+
+Measured, and this one is a false hope. Per-character confidences for the wrong
+read `47250781` were `91 91 94 98 97 98 93 94`; for a correct read they were
+`99 99 99 99 99 99 99 87`. The wrong answer's *minimum* character confidence is
+higher than the correct answer's. The distributions overlap, so per-character
+confidence cannot discriminate.
+
+Whole-word confidence is weakly informative (39 for `47250781` against 95-96 for
+correct reads) but also overlaps: `47239794` came back at 84 while a correct read
+at rot=-9 came back at 68. Confidence alone is not a selector.
+
+### Per-position voting — sounds right, measurably is not
+
+Taking the two full 8-digit candidates and picking each position by the higher
+character confidence:
+
+```
+truth      4 7 2 3 9 7 9 1
+-12 read   4 7 2 5 0 7 8 1   (91 91 94 98 97 98 93 94)
+-6  read   4 7 2 3 9 7 9 4   (99 99 99 99 99 99 99 97)
+per-pos    4 7 2 3 9 7 9 4   -> 47239794, still wrong
+```
+
+It repairs positions 4, 5 and 7 and then loses position 8, where the correct `1`
+(confidence 94) is outvoted by a wrong `4` (confidence 97). Positions are not
+independent — a segmentation slip corrupts a contiguous run — and the confidences
+are miscalibrated, so per-position selection inherits both problems.
+
+And for this use case **partial credit is worth nothing**: a phone number wrong in
+one digit is exactly as useless as one wrong in four. Techniques that raise mean
+character accuracy do not convert into task success unless they reach 8 of 8.
+
+### Whole-string majority voting across many angles — this is the one that works
+
+In round 3 I rejected voting, on a case where two of three passes agreed on the
+same wrong number. That rejection was right about the data I had and wrong as a
+general conclusion: with only two or three diverse passes a wrong answer can hold
+a plurality. With a wider sweep the picture inverts, because **errors scatter and
+the truth concentrates** — each bad angle fails in its own way, while every good
+angle produces the same string.
+
+Nine angles (-16 to +16 in steps of 4), 1280px, boosted, digit whitelist:
+
+| image | truth | vote tally | majority |
+| --- | --- | --- | --- |
+| crop3.jpg (the new bottle) | 47239791 | 47239791 x3, 47250781 x1 | **correct** |
+| syn_s1_skew.jpg | 98765432 | 98765432 x4, 98765435 x1 | **correct** |
+| adv_skew12.jpg | 47239791 | 47239791 x2, 37259791 x1 | **correct** |
+| adv_skew7.jpg | 47239791 | 47239791 x2, four different singletons | **correct** |
+| noisy_hard.jpg | 47239791 | 47239791 x4 | correct |
+| syn_s2_near.jpg | 91234567 | 91234567 x6 | correct |
+| crop1.jpg | 47239791 | 47239791 x3, 17239791 x1 | correct |
+
+**7 of 7, including all three cases the shipped pipeline currently gets wrong or
+misses** — the new bottle photo, round 3's remaining wrong number, and round 3's
+remaining miss. No wrong majority anywhere. In every case the correct string is the
+mode and the errors are singletons.
+
+Nine angles cost about 2.9s here. Working the same data through a five-angle subset
+`{-12, -8, -4, +4, +8}` still gives a correct majority on all seven, for roughly
+1.5s.
+
+### Perspective / quadrilateral warp correction — overengineering
+
+Two reasons, both measured. First, the unwarp sweep above shows no effect, because
+curvature is not what is hurting us. Second, any targeted warp needs the label
+located and its skew estimated first, and skew estimation is the hard part. I
+implemented the classic projection-profile method (rotate, measure the peakiness of
+the horizontal projection of dark pixels):
+
+```
+crop1.jpg        est   0 deg   (truth ~0)     ok     177ms
+crop3.jpg        est  -6 deg   (truth ~-11)   close  172ms
+adv_skew7.jpg    est +20 deg   (truth +7)     wrong  13963ms
+adv_skew12.jpg   est -20 deg   (truth +12)    wrong   9189ms
+noisy_hard.jpg   est +20 deg   (truth ~0)     wrong   8331ms
+syn_s2_near.jpg  est -20 deg   (truth ~0)     wrong   4712ms
+```
+
+It works on tight crops and fails completely on full frames, because on a whole
+photo the dark pixels are overwhelmingly background rather than label text. So it
+would require region-of-interest detection first — which is the harder problem, and
+the one a purpose-built scene-text detector would solve for us (see below). And
+even on the tight crop its -6 degree estimate lands on one of the failing angles.
+Precision is not the answer here; diversity is.
+
+## 30. Alternative approaches
+
+### Other client-side OCR engines
+
+The one genuinely interesting option is **PaddleOCR (PP-OCR)**, which has ONNX
+exports runnable in the browser via onnxruntime-web. Architecturally it is a better
+fit than Tesseract for this problem: it is a two-stage *detection then recognition*
+pipeline trained on natural scene text, where the detector returns oriented
+quadrilaterals. That means it does natively, and properly, the two things we have
+been hand-rolling — finding a small text region inside a large photo, and handling
+its rotation — instead of us brute-forcing a preprocessing grid.
+
+Honest confidence levels: I am confident such exports exist and that scene-text
+models substantially outperform Tesseract on photographed text, because that is
+what they are trained for and Tesseract is a document-scan engine. I am *not*
+confident about model size (likely tens of megabytes, against Tesseract's ~5.5MB),
+about iOS Safari WASM latency, or about how much integration work the ONNX runtime
+plus pre/post-processing would be. It would be a substantial rewrite of `ocr.ts`,
+and I have not benchmarked it.
+
+Two options that look attractive but are not viable here: the browser **Shape
+Detection API** (`TextDetector`) is Chrome-only, effectively abandoned, and absent
+from iOS Safari, which is the target platform; and Apple's Live Text / VisionKit is
+excellent at exactly this task but unreachable from a web page.
+
+### Server-side vision LLM
+
+Would almost certainly read this label correctly, and the whole hard tail with it —
+these models handle skew, curvature, glare and low contrast far better than any
+document-OCR engine, because they are trained on ordinary photographs.
+
+Weighed against that: it needs a serverless proxy to hold the API key (I cannot
+provision one from here — that requires an account the operator owns); it costs a
+fraction of a cent per recognition, forever; it ends the "photos never leave the
+phone" property that was a deliberate design decision; and on latency, an image
+downscaled to ~1000px is 100-200KB, so realistically 1.5-4s of upload plus
+inference on mobile data, against the ~1s median just achieved. That is affordable
+within the 5s ceiling, but it is slower than what we have, not faster.
+
+### Hybrid — fast client path, server fallback for the tail
+
+This is the architecturally sensible way to buy the LLM's robustness without paying
+its costs on every photo: run the client pipeline, and call out only when it fails
+to produce a confident number. The catch is that it is worth building *in
+proportion to how big the tail is*, and the digit-voting result above suggests the
+tail is about to get much smaller. I would measure after voting lands before
+deciding the fallback is needed at all.
+
+### Capture-side and UX mitigations
+
+One cheap idea is well supported by the evidence and one is not.
+
+Worth doing: a one-line hint at capture time to **hold the phone so the label's
+text runs left to right**. Rotation is the entire remaining error cause, and unlike
+curvature the user can usually fix it for free by turning the phone, even when the
+sticker's placement on a curved bottle is fixed. That is a text change, not an
+algorithm.
+
+Not worth doing: asking the user to re-shoot, or merging multiple user photos.
+Re-shooting works by giving the pipeline an independent sample — but internal
+multi-angle voting already extracts exactly that benefit from the single photo the
+user already took, without asking them for anything. Live preview overlays and
+framing guidance are a lot of machinery for the same effect. And none of it helps
+if the sticker is genuinely on a curved surface with no flatter angle available.
+
+## 31. Recommendation
+
+**Not at the ceiling, and the next step is concrete.** I would implement a
+digit-focused multi-angle voting fallback, and I would not invest in a backend yet.
+
+Specifically: keep the current fast path exactly as it is — it answers most photos
+in one or two passes at about 1s, and 42 of 44 correctly. When it fails to produce
+an accepted number, replace today's flailing fallback tail with a digit pass
+(character whitelist `0123456789`, contrast boosted, 1280px) run at about five
+rotations, and take the 8-digit string that the most passes agree on. Decline to
+fill the field if no string gets at least two votes — an empty field the user fills
+in is much better than a plausible wrong number.
+
+Why this and not something else:
+
+- It is measured, not hoped for: 7 of 7 on the test set, including all three cases
+  the current pipeline gets wrong or misses.
+- It is roughly latency-neutral. Today's fallback already spends up to nine passes
+  and about 3.8s and usually fails; five targeted voting passes cost about 1.5s and
+  succeed. The easy path is untouched, so the ~1s median stands.
+- It reuses everything already built — the same worker, the same preprocessing, the
+  same scoring — and stays client-side, free and private.
+- It attacks the one cause that accounts for the entire remaining tail, rather than
+  patching individual photos.
+
+I would pair it with the capture hint about holding the phone so the text runs
+horizontally, which is nearly free.
+
+What I would *not* do now: build the perspective/quadrilateral warp (measured as
+irrelevant here, and its prerequisite skew estimation does not work on full
+frames), or stand up the server-side LLM proxy. The LLM route is the right answer
+if voting lands and a stubborn tail remains — it is a real option, not a
+last resort — but committing to a backend, a recurring cost and the loss of the
+privacy property is premature while a cheaper client-side fix with 7-of-7 evidence
+behind it is unimplemented.
+
+Honest caveats on that recommendation: the voting evidence is seven images, three
+of them synthetic, and majority voting could in principle entrench an error on an
+image that is misread the same way at every angle — my data shows no such case but
+seven images cannot rule it out. The tie-breaking and minimum-vote rules need care,
+since a careless version would trade misses for confident wrong answers, which is
+the worse failure. And this is still desktop Chromium, not an iPhone.
+
+Finally, worth keeping in view: the confirm screen is a genuine safety net and this
+whole tail is recoverable by a human in a couple of seconds. If the operator would
+rather stop here, "ship round 3 and let the confirm screen absorb the tail" is a
+defensible position — 42 of 44 with a mandatory review step is a working product.
+My recommendation is to do the voting fallback because it is cheap, evidenced and
+targets the actual cause, not because the current state is unusable.
