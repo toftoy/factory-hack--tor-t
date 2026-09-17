@@ -97,13 +97,28 @@ let confirmFields: ConfirmFields | null = null;
  */
 let hasCapturedBefore = false;
 
+/** Caps a hung `getCurrentPosition()` — documented to sometimes never resolve at
+ * all regardless of its own `timeout` option (Chromium #342194498, Mozilla
+ * #822967), which would otherwise leave "Henter sted …" stuck forever. */
+const LIVE_GPS_TIMEOUT_MS = 10_000;
+
 /**
- * A live GPS fix, requested once when the app loads and reused for every item
- * captured in this session — see `resolveLocation`. A permission prompt and GPS
- * fix per item is not something the OS lets a web app skip, so the app avoids
- * repeating it rather than trying to work around it.
+ * A live GPS fix, requested once — on the first "Ta bilde av lappen" tap, not
+ * at page load — and reused for every item captured in this session, see
+ * `resolveLocation`. Requesting it unprompted at load is a known anti-pattern
+ * (flagged by Chrome's own Lighthouse audit) that can get the permission
+ * prompt ignored or the call left hanging on some mobile browsers; tying it to
+ * the button tap makes it a genuine user gesture instead, while still starting
+ * it before the photo itself is even taken.
  */
-const sessionLiveCoords: Promise<Coords | null> = getLiveCoords();
+let sessionLiveCoords: Promise<Coords | null> | null = null;
+
+function getSessionLiveCoords(): Promise<Coords | null> {
+  if (!sessionLiveCoords) {
+    sessionLiveCoords = withTimeout(getLiveCoords(), LIVE_GPS_TIMEOUT_MS, null);
+  }
+  return sessionLiveCoords;
+}
 
 interface AppState {
   screen: Screen;
@@ -206,7 +221,7 @@ function startNoteOcr(file: File): PendingOcr {
 function startLocationLookup(): PendingLocation {
   state.diagnostics.locationStartedAt = Date.now();
   const pending: PendingLocation = {
-    value: resolveLocation(sessionLiveCoords).catch(() => null),
+    value: resolveLocation(getSessionLiveCoords()).catch(() => null),
     resolved: null,
     settled: false,
   };
@@ -302,7 +317,12 @@ function renderCaptureButton(): HTMLElement {
   button.type = 'button';
   button.className = 'primary';
   button.textContent = 'Ta bilde av lappen';
-  button.addEventListener('click', () => input.click());
+  button.addEventListener('click', () => {
+    // Started here, inside the tap, rather than at page load — see
+    // `getSessionLiveCoords`.
+    getSessionLiveCoords();
+    input.click();
+  });
 
   wrapper.append(button, input);
 

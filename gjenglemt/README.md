@@ -79,10 +79,11 @@ utviklingsomgivelsen:
       bildet er tatt, uten noen "Gå videre"-knapp å trykke
 - [ ] OCR klarer å lese et vanlig håndskrevet/trykt navn og
       telefonnummer fra lappen
-- [ ] Finnested fylles ut automatisk fra telefonens GPS (hentet med én
-      gang appen lastes) — "Henter sted …" vises i feltet mens det
-      pågår, og feltet fylles inn kort tid etter at meldingsskjermen
-      vises
+- [ ] Finnested fylles ut automatisk fra telefonens GPS (hentet idet du
+      trykker "Ta bilde av lappen", ikke idet siden lastes) — "Henter
+      sted …" vises i feltet mens det pågår, og feltet fylles inn kort
+      tid etter at meldingsskjermen vises. Feltet skal aldri stå på
+      "Henter sted …" i mer enn ca. 10 sekunder
 - [ ] "Åpne melding"-knappen åpner Meldinger direkte i riktig samtale
       med teksten ferdig utfylt (ikke en generisk delingsmeny)
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
