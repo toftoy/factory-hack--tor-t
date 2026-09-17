@@ -45,6 +45,9 @@ interface Diagnostics {
   budgetMs: number;
   waitedMs: number;
   deadlineHit: boolean;
+  locationStartedAt: number;
+  locationSettledAt: number;
+  locationValue: string | null;
 }
 
 /** A recognition job started early, plus whatever partial text it has produced. */
@@ -59,6 +62,8 @@ interface PendingLocation {
   value: Promise<string | null>;
   /** Null until it resolves, so `analyze()` can take it without waiting. */
   resolved: string | null;
+  /** True once `value` has settled, even if it settled to null (nothing found). */
+  settled: boolean;
 }
 
 /**
@@ -67,6 +72,8 @@ interface PendingLocation {
  */
 interface ConfirmFields {
   setSted: (value: string) => void;
+  /** Clears the "Henter sted …" placeholder once the lookup has settled, found or not. */
+  setStedSettled: () => void;
 }
 
 let confirmFields: ConfirmFields | null = null;
@@ -74,7 +81,6 @@ let confirmFields: ConfirmFields | null = null;
 interface AppState {
   screen: Screen;
   photos: CapturedPhoto[];
-  extraRequested: boolean;
   /** Timestamp of the most recent capture, whichever photo it was. */
   lastCaptureAt: number;
   ocr: PendingOcr | null;
@@ -91,7 +97,6 @@ interface AppState {
 const state: AppState = {
   screen: 'capture',
   photos: [],
-  extraRequested: false,
   lastCaptureAt: 0,
   ocr: null,
   location: null,
@@ -107,6 +112,9 @@ const state: AppState = {
     budgetMs: 0,
     waitedMs: 0,
     deadlineHit: false,
+    locationStartedAt: 0,
+    locationSettledAt: 0,
+    locationValue: null,
   },
 };
 
@@ -130,9 +138,7 @@ function labelForRole(role: PhotoRole): string {
     case 'note':
       return 'Ta bilde av lappen';
     case 'garment':
-      return 'Ta bilde av plagget';
-    case 'extra':
-      return 'Ta et ekstra bilde';
+      return 'Ta bilde av plagget/tingen';
   }
 }
 
@@ -141,9 +147,7 @@ function nounForRole(role: PhotoRole): string {
     case 'note':
       return 'lappen';
     case 'garment':
-      return 'plagget';
-    case 'extra':
-      return 'ekstrabildet';
+      return 'plagget/tingen';
   }
 }
 
@@ -201,12 +205,17 @@ function startNoteOcr(file: File): PendingOcr {
  * an absolute ceiling for the worst case, not a duration every run should take.
  */
 function startLocationLookup(file: File): PendingLocation {
+  state.diagnostics.locationStartedAt = Date.now();
   const pending: PendingLocation = {
     value: resolveLocation(file).catch(() => null),
     resolved: null,
+    settled: false,
   };
   void pending.value.then((value) => {
     pending.resolved = value;
+    pending.settled = true;
+    state.diagnostics.locationSettledAt = Date.now();
+    state.diagnostics.locationValue = value;
     backfillLocation(value);
   });
   return pending;
@@ -216,9 +225,14 @@ function startLocationLookup(file: File): PendingLocation {
  * Fill in `Sted` once a slow location lookup finally lands.
  *
  * Follows the same rule as `meldingDirty`: anything the user has already put
- * there wins, and we only ever fill a field that is still empty.
+ * there wins, and we only ever fill a field that is still empty. The confirm
+ * screen's "Henter sted …" placeholder is cleared either way, since the lookup
+ * has an answer now even when that answer is "nothing found" — reachable in the
+ * overwhelming majority of runs, since OCR (median ~845ms) settles the confirm
+ * screen long before a GPS fix and reverse-geocode round trip typically can.
  */
 function backfillLocation(value: string | null): void {
+  confirmFields?.setStedSettled();
   if (!value) return;
   if (state.sted !== '') return;
   state.sted = value;
@@ -290,7 +304,7 @@ function renderIntro(): HTMLElement {
   const steps = document.createElement('ol');
   for (const step of [
     'Ta bilde av lappen med navn og telefonnummer',
-    'Ta bilde av plagget',
+    'Ta bilde av plagget/tingen',
     'Sjekk at navn, telefon og sted stemmer',
     'Åpne meldingen og send den',
   ]) {
@@ -311,23 +325,12 @@ function renderCaptureScreen(): HTMLElement {
     container.appendChild(renderIntro());
   }
 
-  const role = nextCaptureRole(state.photos, state.extraRequested);
+  const role = nextCaptureRole(state.photos);
   if (role) {
     container.appendChild(renderCaptureButton(role));
   }
 
   if (canProceed(state.photos)) {
-    if (!state.extraRequested) {
-      const addExtra = document.createElement('button');
-      addExtra.type = 'button';
-      addExtra.textContent = 'Legg til et bilde til';
-      addExtra.addEventListener('click', () => {
-        state.extraRequested = true;
-        render();
-      });
-      container.appendChild(addExtra);
-    }
-
     const proceed = document.createElement('button');
     proceed.type = 'button';
     proceed.className = 'primary';
@@ -373,7 +376,7 @@ async function analyze(): Promise<void> {
   // Both jobs were started at capture time; only pick them up here. Whatever is
   // left of the 5s budget since the last shutter is all the extra time they get.
   const ocr = state.ocr ?? startNoteOcr(notePhoto.file);
-  const location = state.location ?? startLocationLookup(garmentPhoto.file);
+  const location = state.location ?? (state.location = startLocationLookup(garmentPhoto.file));
   const budget = Math.max(0, RESULT_DEADLINE_MS - (Date.now() - state.lastCaptureAt));
   const waitStartedAt = Date.now();
 
@@ -427,8 +430,17 @@ function labeledTextInput(
  * function together with the rest of the `?debug=1` plumbing.
  */
 function renderDebugPanel(): HTMLElement {
-  const { passes, noteCapturedAt, ocrSettledAt, budgetMs, waitedMs, deadlineHit } =
-    state.diagnostics;
+  const {
+    passes,
+    noteCapturedAt,
+    ocrSettledAt,
+    budgetMs,
+    waitedMs,
+    deadlineHit,
+    locationStartedAt,
+    locationSettledAt,
+    locationValue,
+  } = state.diagnostics;
 
   const totalOcrMs = passes.reduce((total, pass) => total + pass.ms, 0);
   const lines = [
@@ -436,6 +448,8 @@ function renderDebugPanel(): HTMLElement {
     `passes=${passes.length}  ocrTime=${totalOcrMs}ms` +
       `  noteShutter->ocrDone=${ocrSettledAt ? ocrSettledAt - noteCapturedAt : -1}ms` +
       `  noteShutter->lastShutter=${state.lastCaptureAt - noteCapturedAt}ms`,
+    `sted: ${locationSettledAt ? `settled after ${locationSettledAt - locationStartedAt}ms` : locationStartedAt ? 'still pending' : 'not started'}` +
+      `  value=${JSON.stringify(locationValue)}`,
     `ua=${navigator.userAgent}`,
     '',
     ...passes.map(
@@ -521,6 +535,12 @@ function renderConfirmScreen(): HTMLElement {
     state.sted = value;
     syncMeldingIfNotDirty();
   });
+  // OCR (median ~845ms) settles the confirm screen well before a location lookup
+  // usually can, so Sted is normally still empty here — without this the field
+  // just looks blank/failed rather than still working on it.
+  if (state.sted === '' && state.location && !state.location.settled) {
+    stedInput.placeholder = 'Henter sted …';
+  }
   container.appendChild(stedLabel);
 
   // Let a location lookup that is still running fill this in when it lands,
@@ -529,6 +549,9 @@ function renderConfirmScreen(): HTMLElement {
     setSted: (value) => {
       stedInput.value = value;
       syncMeldingIfNotDirty();
+    },
+    setStedSettled: () => {
+      stedInput.placeholder = '';
     },
   };
 

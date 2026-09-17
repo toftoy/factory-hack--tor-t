@@ -44,10 +44,18 @@ export function getLiveCoords(): Promise<Coords | null> {
   });
 }
 
+/** Caps a reverse-geocode request that would otherwise hang indefinitely on a slow network. */
+const REVERSE_GEOCODE_TIMEOUT_MS = 8_000;
+
 export async function reverseGeocode(coords: Coords): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REVERSE_GEOCODE_TIMEOUT_MS);
   const response = await fetch(buildNominatimUrl(coords.lat, coords.lng), {
     headers: { Accept: 'application/json' },
-  }).catch(() => null);
+    signal: controller.signal,
+  })
+    .catch(() => null)
+    .finally(() => clearTimeout(timer));
   if (!response || !response.ok) return null;
   const json = (await response.json().catch(() => null)) as NominatimResponse | null;
   return parseNominatimResponse(json);

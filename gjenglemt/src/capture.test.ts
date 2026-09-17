@@ -8,25 +8,15 @@ function photo(role: CapturedPhoto['role']): CapturedPhoto {
 
 describe('nextCaptureRole', () => {
   it('asks for the note first when nothing captured', () => {
-    expect(nextCaptureRole([], false)).toBe('note');
+    expect(nextCaptureRole([])).toBe('note');
   });
 
   it('asks for the garment after the note', () => {
-    expect(nextCaptureRole([photo('note')], false)).toBe('garment');
+    expect(nextCaptureRole([photo('note')])).toBe('garment');
   });
 
-  it('returns null once note and garment exist and no extra was requested', () => {
-    expect(nextCaptureRole([photo('note'), photo('garment')], false)).toBeNull();
-  });
-
-  it('asks for an extra photo once requested', () => {
-    expect(nextCaptureRole([photo('note'), photo('garment')], true)).toBe('extra');
-  });
-
-  it('returns null once the requested extra photo exists', () => {
-    expect(
-      nextCaptureRole([photo('note'), photo('garment'), photo('extra')], true)
-    ).toBeNull();
+  it('returns null once note and garment exist', () => {
+    expect(nextCaptureRole([photo('note'), photo('garment')])).toBeNull();
   });
 });
 
@@ -36,7 +26,7 @@ describe('canProceed', () => {
     expect(canProceed([photo('note')])).toBe(false);
   });
 
-  it('is true once note and garment are captured, regardless of extra', () => {
+  it('is true once note and garment are captured', () => {
     expect(canProceed([photo('note'), photo('garment')])).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-export type PhotoRole = 'note' | 'garment' | 'extra';
+export type PhotoRole = 'note' | 'garment';
 
 export interface CapturedPhoto {
   role: PhotoRole;
