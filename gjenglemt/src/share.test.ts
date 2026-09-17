@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildSmsLink, shareOrFallback } from './share';
+import { describe, it, expect } from 'vitest';
+import { buildSmsLink } from './share';
 
 describe('buildSmsLink', () => {
   it('uses & as separator on iOS', () => {
@@ -24,58 +24,5 @@ describe('buildSmsLink', () => {
   it('strips spaces and other non-digit characters (except a leading +) from the phone number', () => {
     const link = buildSmsLink('99 88 77 66', 'Hei', 'Android');
     expect(link.startsWith('sms:99887766?body=')).toBe(true);
-  });
-});
-
-describe('shareOrFallback', () => {
-  afterEach(() => {
-    delete (navigator as unknown as Record<string, unknown>).canShare;
-    delete (navigator as unknown as Record<string, unknown>).share;
-  });
-
-  it('calls navigator.share when file sharing is supported', async () => {
-    const canShare = vi.fn().mockReturnValue(true);
-    const share = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'canShare', { value: canShare, configurable: true });
-    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
-
-    const file = new File([''], 'note.jpg', { type: 'image/jpeg' });
-    const result = await shareOrFallback([file], 'Hei', '99887766');
-
-    expect(share).toHaveBeenCalledWith({ files: [file], text: 'Hei' });
-    expect(result).toEqual({ shared: true });
-  });
-
-  it('falls back to an sms: link when sharing is unsupported', async () => {
-    const file = new File([''], 'note.jpg', { type: 'image/jpeg' });
-    const result = await shareOrFallback([file], 'Hei', '99887766');
-
-    expect(result.shared).toBe(false);
-    expect(result.fallbackSmsLink).toContain('sms:99887766');
-  });
-
-  it('treats navigator.share rejecting with AbortError as a successful (cancelled) share', async () => {
-    const canShare = vi.fn().mockReturnValue(true);
-    const share = vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'));
-    Object.defineProperty(navigator, 'canShare', { value: canShare, configurable: true });
-    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
-
-    const file = new File([''], 'note.jpg', { type: 'image/jpeg' });
-    const result = await shareOrFallback([file], 'Hei', '99887766');
-
-    expect(result).toEqual({ shared: true });
-  });
-
-  it('falls back to an sms: link when navigator.share rejects with a non-abort error', async () => {
-    const canShare = vi.fn().mockReturnValue(true);
-    const share = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'));
-    Object.defineProperty(navigator, 'canShare', { value: canShare, configurable: true });
-    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
-
-    const file = new File([''], 'note.jpg', { type: 'image/jpeg' });
-    const result = await shareOrFallback([file], 'Hei', '99887766');
-
-    expect(result.shared).toBe(false);
-    expect(result.fallbackSmsLink).toContain('sms:99887766');
   });
 });

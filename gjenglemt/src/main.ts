@@ -5,7 +5,7 @@ import { runOcr, warmUpOcr, type OcrPassReport } from './ocr';
 import { extractNameAndPhone } from './extract';
 import { resolveLocation } from './location';
 import { renderMessage } from './template';
-import { shareOrFallback } from './share';
+import { buildSmsLink } from './share';
 
 type Screen = 'capture' | 'analyzing' | 'confirm';
 
@@ -240,9 +240,52 @@ function renderCaptureButton(role: PhotoRole): HTMLElement {
   return wrapper;
 }
 
+/**
+ * Short pitch shown before the first photo is taken, explaining what the app
+ * is for and how it works. Gone once capture starts so it doesn't clutter the
+ * screen the user actually returns to while taking photos.
+ */
+function renderIntro(): HTMLElement {
+  const intro = document.createElement('div');
+  intro.className = 'intro';
+
+  const title = document.createElement('h1');
+  title.textContent = 'Gjenglemt';
+  intro.appendChild(title);
+
+  const pitch = document.createElement('p');
+  pitch.textContent =
+    'Masse klær og greier blir gjenglemt. Denne siden gjør det lettere å varsle eieren om hva du har funnet og hvor.';
+  intro.appendChild(pitch);
+
+  const howHeading = document.createElement('p');
+  howHeading.className = 'intro-how';
+  howHeading.textContent = 'Slik funker det:';
+  intro.appendChild(howHeading);
+
+  const steps = document.createElement('ol');
+  for (const step of [
+    'Ta bilde av lappen med navn og telefonnummer',
+    'Ta bilde av plagget',
+    'Sjekk at navn, telefon og sted stemmer',
+    'Åpne meldingen og send den',
+  ]) {
+    const item = document.createElement('li');
+    item.textContent = step;
+    steps.appendChild(item);
+  }
+  intro.appendChild(steps);
+
+  return intro;
+}
+
 function renderCaptureScreen(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'screen screen-capture';
+
+  if (state.photos.length === 0) {
+    container.appendChild(renderIntro());
+  }
 
   const role = nextCaptureRole(state.photos, state.extraRequested);
   if (role) {
@@ -464,7 +507,7 @@ function renderConfirmScreen(): HTMLElement {
   const sendButton = document.createElement('button');
   sendButton.type = 'button';
   sendButton.className = 'primary';
-  sendButton.textContent = 'Send';
+  sendButton.textContent = 'Åpne melding';
   container.appendChild(sendButton);
 
   const status = document.createElement('div');
@@ -475,33 +518,27 @@ function renderConfirmScreen(): HTMLElement {
   // TEMPORARY DIAGNOSTIC — see DEBUG.
   if (DEBUG) container.appendChild(renderDebugPanel());
 
+  // Opens Meldinger directly in the right conversation, text pre-filled — see
+  // buildSmsLink for why this is the primary path rather than navigator.share.
+  // Photos can't be attached this way, so they're offered as a manual
+  // follow-up: the conversation is already open and correctly addressed, so
+  // attaching a photo there is a couple of taps.
   sendButton.addEventListener('click', () => {
-    void (async () => {
-      const files = state.photos.map((p) => p.file);
-      const result = await shareOrFallback(files, state.melding, state.telefon);
-      if (result.shared) return;
+    window.location.href = buildSmsLink(state.telefon, state.melding, navigator.userAgent);
 
-      status.hidden = false;
-      status.innerHTML = '';
-      const note = document.createElement('p');
-      note.textContent = 'Husk å legge ved bildene manuelt:';
-      status.appendChild(note);
+    status.hidden = false;
+    status.innerHTML = '';
+    const note = document.createElement('p');
+    note.textContent = 'Legg ved bildene i samtalen som åpner seg:';
+    status.appendChild(note);
 
-      if (result.fallbackSmsLink) {
-        const link = document.createElement('a');
-        link.href = result.fallbackSmsLink;
-        link.textContent = 'Åpne meldinger';
-        status.appendChild(link);
-      }
-
-      for (const photo of state.photos) {
-        const download = document.createElement('a');
-        download.href = URL.createObjectURL(photo.file);
-        download.download = photo.file.name || `${photo.role}.jpg`;
-        download.textContent = `Last ned bilde av ${nounForRole(photo.role)}`;
-        status.appendChild(download);
-      }
-    })();
+    for (const photo of state.photos) {
+      const download = document.createElement('a');
+      download.href = URL.createObjectURL(photo.file);
+      download.download = photo.file.name || `${photo.role}.jpg`;
+      download.textContent = `Last ned bilde av ${nounForRole(photo.role)}`;
+      status.appendChild(download);
+    }
   });
 
   return container;

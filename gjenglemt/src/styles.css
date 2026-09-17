@@ -17,6 +17,30 @@ body {
   margin: 0 auto;
 }
 
+.intro {
+  margin-bottom: 0.5rem;
+}
+
+.intro h1 {
+  margin: 0 0 0.5rem;
+  color: #2b6777;
+}
+
+.intro p {
+  margin: 0 0 0.5rem;
+  line-height: 1.4;
+}
+
+.intro-how {
+  font-weight: 600;
+}
+
+.intro ol {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  line-height: 1.5;
+}
+
 button {
   padding: 0.9rem 1rem;
   font-size: 1rem;
