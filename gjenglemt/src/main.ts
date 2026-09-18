@@ -133,15 +133,33 @@ let sessionLiveCoords: Promise<Coords | null> | null = null;
  */
 let lastGeolocationFailure: GeolocationFailure | null = null;
 
+function fetchLiveCoordsOnce(): Promise<Coords | null> {
+  lastGeolocationFailure = null;
+  return withTimeout(
+    getLiveCoords((failure) => {
+      lastGeolocationFailure = failure;
+    }),
+    LIVE_GPS_TIMEOUT_MS,
+    null
+  );
+}
+
+/**
+ * One retry, but only for the "never called back at all" case — confirmed on
+ * a real device (`lastGeolocationFailure` stayed `null`, meaning our own
+ * timeout fired because neither the success nor the error callback ever ran).
+ * That matches a known, unfixed engine bug where `getCurrentPosition()` just
+ * hangs; trying again is a documented workaround for exactly this, since a
+ * second call often succeeds where the first didn't. A real browser error
+ * (permission denied, no fix available, the browser's own timeout) is a
+ * definite answer already — asking again won't change it.
+ */
 function getSessionLiveCoords(): Promise<Coords | null> {
   if (!sessionLiveCoords) {
-    sessionLiveCoords = withTimeout(
-      getLiveCoords((failure) => {
-        lastGeolocationFailure = failure;
-      }),
-      LIVE_GPS_TIMEOUT_MS,
-      null
-    );
+    sessionLiveCoords = fetchLiveCoordsOnce().then((first) => {
+      if (first || lastGeolocationFailure !== null) return first;
+      return fetchLiveCoordsOnce();
+    });
   }
   return sessionLiveCoords;
 }

@@ -79,8 +79,11 @@ utviklingsomgivelsen:
 - [ ] Kameraet åpner seg direkte når du trykker "Ta bilde av lappen",
       på både iOS Safari og Android Chrome
 - [ ] "Hent sted" på forsiden ber om posisjonstillatelse og viser
-      "Posisjon hentet." (eller "Fant ikke posisjon.") — kan trykkes
-      før noe bilde er tatt
+      "Posisjon hentet." (eller "Fant ikke posisjon (årsak)." med en
+      konkret grunn) — kan trykkes før noe bilde er tatt. Et forsøk der
+      nettleseren aldri svarer prøves automatisk på nytt én gang før
+      den gir opp (kjent nettleser-svakhet, ikke noe appen kan fikse
+      helt)
 - [ ] OCR klarer å lese et vanlig håndskrevet/trykt navn og
       telefonnummer fra lappen
 - [ ] Meldinger åpnes automatisk rett etter at lapp-bildet er tatt, uten
@@ -89,7 +92,8 @@ utviklingsomgivelsen:
 - [ ] Sted er med i den automatisk åpnede meldingen hvis "Hent sted" ble
       trykket først; hvis ikke, sjekk at det i alle fall dukker opp i
       bekreftelsesskjermen i etterkant (feltet skal aldri stå på
-      "Henter sted …" i mer enn ca. 10 sekunder)
+      "Henter sted …" i mer enn ca. 20 sekunder verst tenkelig tilfelle,
+      siden et hengende forsøk prøves på nytt én gang)
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
       fylle inn Sted manuelt uten å henge seg opp
 - [ ] "Nytt funn" på meldingsskjermen fører deg tilbake til kameraet
