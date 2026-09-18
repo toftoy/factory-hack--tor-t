@@ -91,6 +91,12 @@ interface ConfirmFields {
 let confirmFields: ConfirmFields | null = null;
 
 /**
+ * Set by `renderConfirmScreen` to its "Åpne melding" handler, so `analyze()`
+ * can fire it automatically the moment navn/telefon are read.
+ */
+let triggerOpenMessage: (() => void) | null = null;
+
+/**
  * True once the intro pitch has been shown, so a "Nytt funn" reset (see
  * `renderConfirmScreen`) returns straight to the camera instead of repeating
  * the pitch for someone already partway through sorting several items.
@@ -156,6 +162,7 @@ function render(): void {
   app.innerHTML = '';
   // The old confirm screen's inputs are gone; drop the handles to them.
   confirmFields = null;
+  triggerOpenMessage = null;
   if (state.screen === 'capture') {
     app.appendChild(renderCaptureScreen());
   } else if (state.screen === 'analyzing') {
@@ -278,9 +285,9 @@ function renderIntro(): HTMLElement {
 
   const steps = document.createElement('ol');
   for (const step of [
+    'Trykk «Hent sted» først hvis du skal sortere flere gjenstander',
     'Ta bilde av lappen med navn og telefonnummer',
-    'Sjekk at navn, telefon og sted stemmer',
-    'Åpne meldingen og send den',
+    'Meldingen åpnes automatisk, ferdig utfylt',
     'Ta bilde av plagget/tingen i meldingen og send det',
   ]) {
     const item = document.createElement('li');
@@ -337,6 +344,38 @@ function renderCaptureButton(): HTMLElement {
   return wrapper;
 }
 
+/**
+ * Lets the user start the live GPS fetch (and its permission prompt) ahead of
+ * time — e.g. right when arriving somewhere with several items to sort —
+ * instead of only at the first photo. The message now opens automatically as
+ * soon as navn/telefon are read (see `analyze`), which is usually well before
+ * a GPS fix would otherwise be ready; fetching it here first is what makes
+ * Sted actually make it into that auto-sent message instead of coming up
+ * empty every time.
+ */
+function renderLocationButton(): HTMLElement {
+  const wrapper = document.createElement('div');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = 'Hent sted';
+
+  const status = document.createElement('p');
+  status.className = 'hint';
+  status.hidden = true;
+
+  button.addEventListener('click', () => {
+    status.hidden = false;
+    status.textContent = 'Henter posisjon …';
+    void getSessionLiveCoords().then((coords) => {
+      status.textContent = coords ? 'Posisjon hentet.' : 'Fant ikke posisjon.';
+    });
+  });
+
+  wrapper.append(button, status);
+  return wrapper;
+}
+
 function renderCaptureScreen(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'screen screen-capture';
@@ -345,6 +384,7 @@ function renderCaptureScreen(): HTMLElement {
     container.appendChild(renderIntro());
   }
 
+  container.appendChild(renderLocationButton());
   container.appendChild(renderCaptureButton());
 
   return container;
@@ -408,6 +448,12 @@ async function analyze(): Promise<void> {
   state.meldingDirty = false;
   state.screen = 'confirm';
   render();
+  // Land straight in Meldinger the moment navn/telefon are read, rather than
+  // waiting for a manual tap — per explicit user request. Sted only makes it
+  // into the message if it was already resolved by now (see
+  // `renderLocationButton`); the confirm screen stays behind as a manual
+  // fallback for fixing/resending afterwards.
+  triggerOpenMessage?.();
 }
 
 function labeledTextInput(
@@ -575,12 +621,17 @@ function renderConfirmScreen(): HTMLElement {
   // The lapp photo was only ever for reading name/telefon/sted, not meant to be
   // shared, so nothing is attached automatically here: the user takes a fresh
   // photo of the item straight in that conversation instead.
-  sendButton.addEventListener('click', () => {
+  function openMessage(): void {
     window.location.href = buildSmsLink(state.telefon, state.melding, navigator.userAgent);
 
     status.hidden = false;
     status.textContent = 'Ta bilde av plagget/tingen i samtalen som åpner seg, og send det.';
-  });
+  }
+  sendButton.addEventListener('click', openMessage);
+  // `analyze()` calls this the moment navn/telefon are read, so the user lands
+  // straight in Meldinger without tapping anything — the button above stays as
+  // a manual way to reopen/resend if something needs fixing afterwards.
+  triggerOpenMessage = openMessage;
 
   const newFind = document.createElement('button');
   newFind.type = 'button';

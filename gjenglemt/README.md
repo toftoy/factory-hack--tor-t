@@ -1,12 +1,15 @@
 # gjenglemt
 
 En liten mobilvennlig webapp som hjelper med å varsle eiere av
-gjenglemte klær/ting. Ta bilde av en lapp med navn/telefon, så gjetter
-appen navn og telefon fra bildet og finnested fra telefonens GPS (hentet
-i forkant, gjenbrukt for hele økten), lar deg rette gjetningene, og
-åpner Meldinger direkte i riktig samtale med teksten ferdig utfylt.
-Bildet av plagget/tingen tas ikke gjennom appen — det tas rett i
-samtalen som åpner seg, siden det uansett må legges ved manuelt.
+gjenglemte klær/ting. Trykk «Hent sted» på forhånd hvis du skal sortere
+flere gjenstander (henter GPS-posisjonen én gang og gjenbruker den for
+hele økten), ta bilde av en lapp med navn/telefon, og appen åpner
+Meldinger automatisk — direkte i riktig samtale, med navn, telefon og
+sted ferdig utfylt i teksten, uten at du trenger å trykke på noe selv.
+Bekreftelsesskjermen finnes fortsatt i bakgrunnen som en manuell
+reserve hvis noe må rettes og meldingen åpnes på nytt. Bildet av
+plagget/tingen tas ikke gjennom appen — det tas rett i samtalen som
+åpner seg, siden det uansett må legges ved manuelt.
 
 Se designdokumentet i
 `../docs/superpowers/specs/2026-09-15-gjenglemt-design.md` for
@@ -75,21 +78,25 @@ utviklingsomgivelsen:
 
 - [ ] Kameraet åpner seg direkte når du trykker "Ta bilde av lappen",
       på både iOS Safari og Android Chrome
-- [ ] Appen går automatisk videre til meldingsskjermen så snart lapp-
-      bildet er tatt, uten noen "Gå videre"-knapp å trykke
+- [ ] "Hent sted" på forsiden ber om posisjonstillatelse og viser
+      "Posisjon hentet." (eller "Fant ikke posisjon.") — kan trykkes
+      før noe bilde er tatt
 - [ ] OCR klarer å lese et vanlig håndskrevet/trykt navn og
       telefonnummer fra lappen
-- [ ] Finnested fylles ut automatisk fra telefonens GPS (hentet idet du
-      trykker "Ta bilde av lappen", ikke idet siden lastes) — "Henter
-      sted …" vises i feltet mens det pågår, og feltet fylles inn kort
-      tid etter at meldingsskjermen vises. Feltet skal aldri stå på
-      "Henter sted …" i mer enn ca. 10 sekunder
-- [ ] "Åpne melding"-knappen åpner Meldinger direkte i riktig samtale
-      med teksten ferdig utfylt (ikke en generisk delingsmeny)
+- [ ] Meldinger åpnes automatisk rett etter at lapp-bildet er tatt, uten
+      at du trenger å trykke "Åpne melding" selv — sjekk at samtalen som
+      åpner seg er adressert til riktig nummer
+- [ ] Sted er med i den automatisk åpnede meldingen hvis "Hent sted" ble
+      trykket først; hvis ikke, sjekk at det i alle fall dukker opp i
+      bekreftelsesskjermen i etterkant (feltet skal aldri stå på
+      "Henter sted …" i mer enn ca. 10 sekunder)
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
       fylle inn Sted manuelt uten å henge seg opp
 - [ ] "Nytt funn" på meldingsskjermen fører deg tilbake til kameraet
       for neste gjenstand uten å be om posisjonstillatelse på nytt
+- [ ] Etter at meldingen er åpnet automatisk, sjekk at "Åpne melding"
+      fortsatt fungerer manuelt hvis du retter et felt og vil sende på
+      nytt
 - [ ] "Legg til på Hjem-skjerm" viser riktig ikon og navn
 - [ ] Kom tilbake til appen etter et kamera-opptak og bekreft at du
       havner i meldingsskjermen, ikke tilbake på forsiden — iOS er
