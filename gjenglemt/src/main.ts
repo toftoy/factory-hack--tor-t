@@ -1,7 +1,13 @@
 import './styles.css';
 import { runOcr, warmUpOcr, type OcrPassReport, type OcrResult } from './ocr';
 import { extractNameAndPhone } from './extract';
-import { resolveLocation, getLiveCoords, type Coords } from './location';
+import {
+  resolveLocation,
+  getLiveCoords,
+  describeGeolocationFailure,
+  type Coords,
+  type GeolocationFailure,
+} from './location';
 import { renderMessage } from './template';
 import { buildSmsLink } from './share';
 
@@ -119,9 +125,23 @@ const LIVE_GPS_TIMEOUT_MS = 10_000;
  */
 let sessionLiveCoords: Promise<Coords | null> | null = null;
 
+/**
+ * Why the fetch above came back empty, for the "Hent sted" status line — see
+ * `describeGeolocationFailure`. `null` if it either hasn't failed (yet) or
+ * failed by way of our own `LIVE_GPS_TIMEOUT_MS` timing out instead of a
+ * browser error, which is itself diagnostic (see that function's doc comment).
+ */
+let lastGeolocationFailure: GeolocationFailure | null = null;
+
 function getSessionLiveCoords(): Promise<Coords | null> {
   if (!sessionLiveCoords) {
-    sessionLiveCoords = withTimeout(getLiveCoords(), LIVE_GPS_TIMEOUT_MS, null);
+    sessionLiveCoords = withTimeout(
+      getLiveCoords((failure) => {
+        lastGeolocationFailure = failure;
+      }),
+      LIVE_GPS_TIMEOUT_MS,
+      null
+    );
   }
   return sessionLiveCoords;
 }
@@ -368,7 +388,9 @@ function renderLocationButton(): HTMLElement {
     status.hidden = false;
     status.textContent = 'Henter posisjon …';
     void getSessionLiveCoords().then((coords) => {
-      status.textContent = coords ? 'Posisjon hentet.' : 'Fant ikke posisjon.';
+      status.textContent = coords
+        ? 'Posisjon hentet.'
+        : `Fant ikke posisjon (${describeGeolocationFailure(lastGeolocationFailure)}).`;
     });
   });
 
@@ -497,7 +519,8 @@ function renderDebugPanel(): HTMLElement {
     `passes=${passes.length}  ocrTime=${totalOcrMs}ms` +
       `  shutter->ocrDone=${ocrSettledAt ? ocrSettledAt - noteCapturedAt : -1}ms`,
     `sted: ${locationSettledAt ? `settled after ${locationSettledAt - locationStartedAt}ms` : locationStartedAt ? 'still pending' : 'not started'}` +
-      `  value=${JSON.stringify(locationValue)}`,
+      `  value=${JSON.stringify(locationValue)}` +
+      `  lastGeoFailure=${lastGeolocationFailure === null ? 'null' : lastGeolocationFailure === 'unsupported' ? 'unsupported' : `code${lastGeolocationFailure.code}`}`,
     `ua=${navigator.userAgent}`,
     '',
     ...passes.map(

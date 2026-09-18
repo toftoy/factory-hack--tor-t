@@ -20,18 +20,49 @@ export function parseNominatimResponse(response: NominatimResponse | null): stri
   return response?.display_name?.trim() || null;
 }
 
-export function getLiveCoords(): Promise<Coords | null> {
+/**
+ * Why a live GPS fix didn't come back — `'unsupported'` when the browser has
+ * no Geolocation API at all, otherwise the browser's own error. `null` means
+ * no browser error ever fired (see `describeGeolocationFailure`): the app's
+ * own timeout in `main.ts` gave up first, which is the documented case of
+ * `getCurrentPosition()` simply never calling back at all.
+ */
+export type GeolocationFailure = GeolocationPositionError | 'unsupported';
+
+export function getLiveCoords(
+  onError?: (failure: GeolocationFailure) => void
+): Promise<Coords | null> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
+      onError?.('unsupported');
       resolve(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => resolve(null),
+      (error) => {
+        onError?.(error);
+        resolve(null);
+      },
       { timeout: 10_000 }
     );
   });
+}
+
+/** Turns a `getLiveCoords` failure into Norwegian text for the "Hent sted" status line. */
+export function describeGeolocationFailure(failure: GeolocationFailure | null): string {
+  if (failure === null) return 'fikk aldri svar fra nettleseren';
+  if (failure === 'unsupported') return 'nettleseren støtter ikke posisjon';
+  switch (failure.code) {
+    case 1: // PERMISSION_DENIED
+      return 'tillatelse avslått';
+    case 2: // POSITION_UNAVAILABLE
+      return 'ingen posisjon tilgjengelig';
+    case 3: // TIMEOUT
+      return 'tidsavbrudd';
+    default:
+      return 'ukjent feil';
+  }
 }
 
 /** Caps a reverse-geocode request that would otherwise hang indefinitely on a slow network. */
