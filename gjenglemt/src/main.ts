@@ -383,13 +383,21 @@ function renderCaptureButton(): HTMLElement {
 }
 
 /**
- * Lets the user start the live GPS fetch (and its permission prompt) ahead of
- * time — e.g. right when arriving somewhere with several items to sort —
- * instead of only at the first photo. The message now opens automatically as
- * soon as navn/telefon are read (see `analyze`), which is usually well before
- * a GPS fix would otherwise be ready; fetching it here first is what makes
- * Sted actually make it into that auto-sent message instead of coming up
- * empty every time.
+ * Lets the user start the location lookup (GPS fix + reverse geocode, and the
+ * permission prompt) ahead of time — e.g. right when arriving somewhere with
+ * several items to sort — instead of only at the first photo. The message now
+ * opens automatically as soon as navn/telefon are read (see `analyze`), which
+ * is usually well before this would otherwise be ready; fetching it here
+ * first is what makes Sted actually make it into that auto-sent message
+ * instead of coming up empty every time.
+ *
+ * Also doubles as a manual override: some browsers' geolocation bridge on iOS
+ * is simply broken (confirmed on a real device — hangs with no response at
+ * all in Vivaldi and Chrome, works fine in Safari, a per-browser bug outside
+ * what this app's code can fix), so a plain text field sits right below for
+ * typing Sted in by hand. Reuses `state.location`/`startLocationLookup` — the
+ * exact same per-item lookup `analyze()` would otherwise start at the photo —
+ * so a lookup already in flight or already answered here is not repeated.
  */
 function renderLocationButton(): HTMLElement {
   const wrapper = document.createElement('div');
@@ -402,17 +410,30 @@ function renderLocationButton(): HTMLElement {
   status.className = 'hint';
   status.hidden = true;
 
+  const [stedLabel, stedInput] = labeledTextInput('Sted', state.sted, (value) => {
+    state.sted = value;
+  });
+
   button.addEventListener('click', () => {
     status.hidden = false;
     status.textContent = 'Henter posisjon …';
-    void getSessionLiveCoords().then((coords) => {
-      status.textContent = coords
-        ? 'Posisjon hentet.'
-        : `Fant ikke posisjon (${describeGeolocationFailure(lastGeolocationFailure)}).`;
+    const pending = state.location ?? (state.location = startLocationLookup());
+    void pending.value.then((value) => {
+      if (value) {
+        status.textContent = 'Posisjon hentet.';
+        // `backfillLocation` already set state.sted, unless the user had
+        // already typed something here themselves — either way, reflect
+        // whatever state.sted actually ended up holding.
+        stedInput.value = state.sted;
+      } else {
+        status.textContent =
+          `Fant ikke posisjon (${describeGeolocationFailure(lastGeolocationFailure)}). ` +
+          'Skriv inn manuelt under eller prøv en annen nettleser.';
+      }
     });
   });
 
-  wrapper.append(button, status);
+  wrapper.append(button, status, stedLabel);
   return wrapper;
 }
 
@@ -483,7 +504,12 @@ async function analyze(): Promise<void> {
 
   state.navn = name ?? '';
   state.telefon = telefon ?? '';
-  state.sted = location.resolved ?? '';
+  // Sted may already be set — typed in by hand, or fetched via "Hent sted" —
+  // on the capture screen before the photo was even taken; that always wins
+  // over the location lookup's own answer, same rule as `backfillLocation`.
+  if (state.sted === '') {
+    state.sted = location.resolved ?? '';
+  }
   state.melding = renderMessage({ navn: state.navn, sted: state.sted });
   state.meldingDirty = false;
   state.screen = 'confirm';

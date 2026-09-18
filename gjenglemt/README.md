@@ -2,14 +2,17 @@
 
 En liten mobilvennlig webapp som hjelper med å varsle eiere av
 gjenglemte klær/ting. Trykk «Hent sted» på forhånd hvis du skal sortere
-flere gjenstander (henter GPS-posisjonen én gang og gjenbruker den for
-hele økten), ta bilde av en lapp med navn/telefon, og appen åpner
-Meldinger automatisk — direkte i riktig samtale, med navn, telefon og
-sted ferdig utfylt i teksten, uten at du trenger å trykke på noe selv.
-Bekreftelsesskjermen finnes fortsatt i bakgrunnen som en manuell
-reserve hvis noe må rettes og meldingen åpnes på nytt. Bildet av
-plagget/tingen tas ikke gjennom appen — det tas rett i samtalen som
-åpner seg, siden det uansett må legges ved manuelt.
+flere gjenstander (henter posisjonen én gang og gjenbruker den for hele
+økten, med et felt for å skrive Sted inn manuelt rett under hvis
+posisjon ikke lar seg hente — enkelte nettlesere på iOS har en kjent
+svakhet der posisjonsoppslaget bare henger uten svar), ta bilde av en
+lapp med navn/telefon, og appen åpner Meldinger automatisk — direkte i
+riktig samtale, med navn, telefon og sted ferdig utfylt i teksten, uten
+at du trenger å trykke på noe selv. Bekreftelsesskjermen finnes
+fortsatt i bakgrunnen som en manuell reserve hvis noe må rettes og
+meldingen åpnes på nytt. Bildet av plagget/tingen tas ikke gjennom
+appen — det tas rett i samtalen som åpner seg, siden det uansett må
+legges ved manuelt.
 
 Se designdokumentet i
 `../docs/superpowers/specs/2026-09-15-gjenglemt-design.md` for
@@ -79,23 +82,31 @@ utviklingsomgivelsen:
 - [ ] Kameraet åpner seg direkte når du trykker "Ta bilde av lappen",
       på både iOS Safari og Android Chrome
 - [ ] "Hent sted" på forsiden ber om posisjonstillatelse og viser
-      "Posisjon hentet." (eller "Fant ikke posisjon (årsak)." med en
-      konkret grunn) — kan trykkes før noe bilde er tatt. Et forsøk der
+      "Posisjon hentet." (eller "Fant ikke posisjon (årsak). Skriv inn
+      manuelt under eller prøv en annen nettleser." med en konkret
+      grunn) — kan trykkes før noe bilde er tatt. Et forsøk der
       nettleseren aldri svarer prøves automatisk på nytt én gang før
       den gir opp (kjent nettleser-svakhet, ikke noe appen kan fikse
-      helt)
+      helt — bekreftet: fungerer i Safari på iOS, henger i Vivaldi,
+      avvises i Chrome, på samme enhet)
+- [ ] Sted-feltet på forsiden (rett under "Hent sted") fylles inn
+      automatisk hvis posisjonen ble funnet, og kan alltid skrives inn
+      for hånd i stedet — det den står som når bildet tas, er det som
+      faktisk havner i meldingen
 - [ ] OCR klarer å lese et vanlig håndskrevet/trykt navn og
       telefonnummer fra lappen
 - [ ] Meldinger åpnes automatisk rett etter at lapp-bildet er tatt, uten
       at du trenger å trykke "Åpne melding" selv — sjekk at samtalen som
       åpner seg er adressert til riktig nummer
 - [ ] Sted er med i den automatisk åpnede meldingen hvis "Hent sted" ble
-      trykket først; hvis ikke, sjekk at det i alle fall dukker opp i
+      trykket først eller Sted ble skrevet inn manuelt på forsiden;
+      hvis ikke, sjekk at det i alle fall dukker opp i
       bekreftelsesskjermen i etterkant (feltet skal aldri stå på
       "Henter sted …" i mer enn ca. 20 sekunder verst tenkelig tilfelle,
       siden et hengende forsøk prøves på nytt én gang)
 - [ ] Skru av stedstjenester og bekreft at appen fortsatt lar deg
-      fylle inn Sted manuelt uten å henge seg opp
+      fylle inn Sted manuelt uten å henge seg opp, både på forsiden og
+      på bekreftelsesskjermen
 - [ ] "Nytt funn" på meldingsskjermen fører deg tilbake til kameraet
       for neste gjenstand uten å be om posisjonstillatelse på nytt
 - [ ] Etter at meldingen er åpnet automatisk, sjekk at "Åpne melding"
