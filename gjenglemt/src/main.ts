@@ -519,7 +519,16 @@ async function analyze(): Promise<void> {
   // into the message if it was already resolved by now (see
   // `renderLocationButton`); the confirm screen stays behind as a manual
   // fallback for fixing/resending afterwards.
-  triggerOpenMessage?.();
+  //
+  // Telefon is the one exception: unlike a misread-but-present number (which
+  // the user explicitly chose to risk for speed), an empty one addresses
+  // Meldinger to nobody — sending automatically to no recipient is not faster,
+  // it is just a wasted trip the user then has to notice and undo by hand.
+  // This is always detectable in advance, so it is worth skipping rather than
+  // risking.
+  if (state.telefon !== '') {
+    triggerOpenMessage?.();
+  }
 }
 
 function labeledTextInput(
@@ -643,8 +652,19 @@ function renderConfirmScreen(): HTMLElement {
 
   const [telefonLabel] = labeledTextInput('Telefon', state.telefon, (value) => {
     state.telefon = value;
+    telefonWarning.hidden = value !== '';
   });
   container.appendChild(telefonLabel);
+
+  // Meldinger opening automatically is skipped for exactly this case (see
+  // `analyze`) — an empty recipient is always useless, not just possibly
+  // wrong, so the user needs to know to fix and send it themselves.
+  const telefonWarning = document.createElement('p');
+  telefonWarning.className = 'hint';
+  telefonWarning.textContent =
+    'Fant ikke telefonnummer — fyll inn over og trykk «Åpne melding» selv.';
+  telefonWarning.hidden = state.telefon !== '';
+  container.appendChild(telefonWarning);
 
   const [stedLabel, stedInput] = labeledTextInput('Sted', state.sted, (value) => {
     state.sted = value;

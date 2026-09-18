@@ -98,6 +98,11 @@ utviklingsomgivelsen:
 - [ ] Meldinger åpnes automatisk rett etter at lapp-bildet er tatt, uten
       at du trenger å trykke "Åpne melding" selv — sjekk at samtalen som
       åpner seg er adressert til riktig nummer
+- [ ] Hvis OCR ikke finner et telefonnummer, åpnes IKKE Meldinger
+      automatisk — bekreftelsesskjermen viser i stedet "Fant ikke
+      telefonnummer — fyll inn over og trykk «Åpne melding» selv.", og
+      meldingen fylles inn og sendes fint når du skriver inn nummeret
+      selv og trykker knappen
 - [ ] Sted er med i den automatisk åpnede meldingen hvis "Hent sted" ble
       trykket først eller Sted ble skrevet inn manuelt på forsiden;
       hvis ikke, sjekk at det i alle fall dukker opp i
