@@ -14,13 +14,31 @@ import { buildSmsLink } from './share';
 type Screen = 'capture' | 'analyzing' | 'confirm';
 
 /**
- * Hard budget between the shutter and the confirm screen.
+ * Hard budget between the shutter and the confirm screen. A stated requirement —
+ * *"5 sekunder fra man har tatt det siste bildet er absolutt maksimum"* — and not
+ * a tuning knob: the pipeline is shaped to fit this number, so a pass that does
+ * not fit is a pass to make cheaper, never a reason to raise the ceiling.
  *
- * Recognition is started the moment the photo is captured (see `startNoteOcr`
- * and `startLocationLookup`) so it overlaps whatever render/analyze plumbing
- * runs next. This deadline is what is left of the budget by the time
- * `analyze()` actually runs; anything still unfinished is dropped so the confirm
- * screen never makes the user wait.
+ * This used to be much softer than it reads. Recognition starts at the shutter
+ * (see `startNoteOcr`), and while the app took *two* photos that head start was
+ * spent while the user framed the second one — so by the time `analyze()`
+ * subtracted the elapsed time, the deadline left here was routinely a second or
+ * more short of 5s and the ladder had already been running that long. **That is
+ * gone.** The app has taken a single photo since the auto-send work, `analyze()`
+ * is now called in the same tick as the capture handler, and round 6 measured
+ * `budget=4998ms` on essentially every one of 106 runs: the early start buys
+ * single-digit milliseconds, and the whole five seconds is now spent with the
+ * user watching "Analyserer bilde …".
+ *
+ * So what is left of the budget here is, in practice, the entire budget — and
+ * when it expires the pending OCR is dropped rather than waited on: `analyze()`
+ * falls back to the best text the passes managed (`PendingOcr.partial`), which
+ * is why a truncated run still usually produces the number its primary passes
+ * read. Round 7 measured that fallback holding: of the three images the widened
+ * digit-vote trigger pushed past this deadline, all three kept the verdict they
+ * had before it (two correct, one wrong). Over the same 106 images that trigger
+ * moved deadline truncation from 13 to 14 and the median wait from 1434ms to
+ * 1465ms, because the 63 photos that still take the fast path answer in ~960ms.
  */
 const RESULT_DEADLINE_MS = 5_000;
 
@@ -212,7 +230,11 @@ function render(): void {
 
 /**
  * Start OCR on the photo immediately, so it runs while the rest of the
- * analyze/render plumbing catches up instead of after the fact.
+ * analyze/render plumbing catches up instead of after the fact. Worth keeping,
+ * but worth being honest about what it is worth: with the single-photo flow
+ * `analyze()` follows in the same tick, so this now buys a couple of
+ * milliseconds rather than the seconds it bought when a second photo followed
+ * (see `RESULT_DEADLINE_MS`). The work it hides is `warmUpOcr`'s, done earlier.
  *
  * `runOcr` works through a ladder of preprocessing passes and asks this
  * predicate after each one whether the text is good enough to stop. We treat
@@ -261,7 +283,9 @@ function startNoteOcr(file: File): PendingOcr {
  * round trip, none of which this app controls, and it used to gate the confirm
  * screen alongside OCR: a run where OCR had the right answer in 314ms still sat
  * on the analysing screen for 4935ms because location never resolved. The 5s is
- * an absolute ceiling for the worst case, not a duration every run should take.
+ * an absolute ceiling for the worst case, not a duration every run should take —
+ * measured median is ~1s, and it is OCR alone that decides which of the two a
+ * given photo gets, since nothing overlaps the wait any more.
  */
 function startLocationLookup(): PendingLocation {
   state.diagnostics.locationStartedAt = Date.now();

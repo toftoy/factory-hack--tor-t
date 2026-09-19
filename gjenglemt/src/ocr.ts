@@ -202,10 +202,11 @@ export interface RunOcrOptions {
   /**
    * Pull out the value worth voting on, or null if this text has none.
    *
-   * When the fast path fails, `runOcr` runs a dedicated digit sweep and tallies
-   * what this returns across the passes (see `voteOnDigits`). Supplying it keeps
-   * `ocr.ts` ignorant of what a phone number looks like — `main.ts` answers with
-   * `extract.ts`.
+   * `runOcr` uses it twice: to tally the digit sweep's passes (see
+   * `voteOnDigits`), and to ask what each primary pass read, which is what
+   * decides whether that sweep runs at all (see `shouldVoteOnDigits`). Supplying
+   * it keeps `ocr.ts` ignorant of what a phone number looks like — `main.ts`
+   * answers with `extract.ts`.
    */
   voteCandidate?: (text: string) => string | null;
   /** Abort remaining passes once this signal aborts. */
@@ -220,9 +221,10 @@ export interface OcrResult {
   /**
    * Outcome of the digit vote. Three states, and the caller must tell them apart:
    *
-   *  - `undefined` — the vote has nothing to say, either because the fast path
-   *    already succeeded so it never ran, or because it ran and *abstained*: not
-   *    one of its passes read a value. Trust the number in `text`.
+   *  - `undefined` — the vote has nothing to say, either because it never ran
+   *    (the fast path answered and both primary passes corroborated the number —
+   *    see `shouldVoteOnDigits`), or because it ran and *abstained*: not one of
+   *    its passes read a value. Trust the number in `text`.
    *  - a string — the vote ran and the passes agreed. This value wins over
    *    anything in `text`, which came from passes the vote exists to distrust.
    *  - `null` — the vote ran, its passes *did* read values, and they disagreed.
@@ -262,6 +264,54 @@ export function pickVotedValue(candidates: (string | null)[]): string | null {
   }
   if (tied || best < MIN_VOTES) return null;
   return winner;
+}
+
+/**
+ * Whether the digit vote should run. Exported for unit testing.
+ *
+ * The vote used to run only when the fast path failed outright, on the theory that
+ * a fast-path answer is trustworthy. Round 6 measured that over 106 images and it
+ * is not: **9 of the 11 wrong numbers were decided confidently by the fast path**,
+ * so the vote never saw the cases it exists for.
+ *
+ * Voting on every photo fixes most of them (4 of 9 corrected, 4 blanked, 30/30
+ * controls untouched) but costs +1253ms median on *every* capture, and since the
+ * single-photo flow there is nothing left to overlap that wait with — the user
+ * watches it. So the trigger is the cheapest signal that is already computed:
+ * whether the two primary passes, plain and contrast-boosted, read the *same*
+ * number. Measured over the same 106 images:
+ *
+ * | the two primary passes | n | correct | wrong | missing |
+ * | --- | --- | --- | --- | --- |
+ * | read the same number   | 56 | 54 | 2 | 0 |
+ * | read different numbers |  8 |  1 | 6 | 1 |
+ * | only one read a number | 20 | 15 | 3 | 2 |
+ * | neither read a number  | 22 | 10 | 0 | 12 |
+ *
+ * Agreement is the correctness signal (54/56); everything else is worth the vote.
+ * Note that "only one of them read a number" is deliberately *not* treated as
+ * agreement: one pass reading what the other could not see is uncorroborated, its
+ * wrong rate is 15% against 3.6%, and it holds 3 of the 11 wrong numbers — leaving
+ * it out would take the trigger's coverage from 9 of 11 down to 6 of 11.
+ *
+ * The result runs the vote on roughly a quarter of photos instead of all of them,
+ * and leaves the easy majority — including every upright printed label — at the
+ * fast path's ~950ms.
+ */
+export function shouldVoteOnDigits({
+  settledInFastPath,
+  primaryCandidates,
+}: {
+  settledInFastPath: boolean;
+  /** What each primary pass that ran read as a number, in order, null for none. */
+  primaryCandidates: (string | null)[];
+}): boolean {
+  if (!settledInFastPath) return true;
+  const [first, second] = primaryCandidates;
+  // Both passes must have run and read the same number. One candidate is not two
+  // passes agreeing, however much a single confident-looking number resembles one.
+  if (primaryCandidates.length < 2) return true;
+  return !(first !== null && first === second);
 }
 
 type Worker = Awaited<ReturnType<typeof Tesseract.createWorker>>;
@@ -474,8 +524,8 @@ export async function runOcr(
   let settled = false;
   let lastError: unknown = null;
 
-  /** Runs one recognition. Returns its score, or null if it threw. */
-  const attempt = async (pass: Pass, stage: 'probe' | 'pass'): Promise<number | null> => {
+  /** Runs one recognition. Returns what it read, or null if it threw. */
+  const attempt = async (pass: Pass, stage: 'probe' | 'pass'): Promise<Recognition | null> => {
     const startedAt = Date.now();
     let result: Recognition;
     try {
@@ -504,15 +554,22 @@ export async function runOcr(
       text: result.text,
       accepted,
     });
-    return result.score;
+    return result;
   };
 
   // Stage 1: the best target size upright, plain and boosted. Both always run —
   // no early break — so `bestAccepted` ends up holding whichever of the two found
   // more confident text, rather than just the first one that looked plausible.
+  //
+  // What each of them read as a number is kept: whether the two agree is what
+  // decides the digit vote below (see `shouldVoteOnDigits`). Only passes that
+  // actually ran are recorded, so an abort or a thrown pass reads as "did not
+  // run" rather than as a pass that read nothing.
+  const primaryCandidates: (string | null)[] = [];
   for (const pass of PRIMARY_PASSES) {
     if (signal?.aborted) break;
-    await attempt(pass, 'pass');
+    const result = await attempt(pass, 'pass');
+    if (result && voteCandidate) primaryCandidates.push(voteCandidate(result.text));
   }
 
   // Stage 2: only now, having failed upright, ask whether the label is sideways —
@@ -523,12 +580,12 @@ export async function runOcr(
     let bestProbeScore = 0;
     for (const rotation of PROBE_ROTATIONS) {
       if (settled || signal?.aborted) break;
-      const score = await attempt(
+      const probe = await attempt(
         { maxDim: PROBE_MAX_DIM, rotation, boostContrast: true },
         'probe'
       );
-      if (score !== null && score > bestProbeScore) {
-        bestProbeScore = score;
+      if (probe && probe.score > bestProbeScore) {
+        bestProbeScore = probe.score;
         orientation = rotation;
       }
     }
@@ -563,8 +620,18 @@ export async function runOcr(
   // number it read is junk, which is exactly how the bottle photo produced a
   // confident `47250781`. On the tail the vote is the authority for the number;
   // the refinement passes above stay for the name.
+  //
+  // It also runs when the fast path *did* answer but the two primary passes did
+  // not corroborate each other — see `shouldVoteOnDigits`, which is where the
+  // measurement behind that lives. A fast-path answer is not self-evidently
+  // right: 9 of round 6's 11 wrong numbers were fast-path answers.
   let voted: string | null | undefined;
-  if (voteCandidate && !settledInFastPath && recognised && !signal?.aborted) {
+  if (
+    voteCandidate &&
+    shouldVoteOnDigits({ settledInFastPath, primaryCandidates }) &&
+    recognised &&
+    !signal?.aborted
+  ) {
     const vote = await voteOnDigits({
       worker,
       image,

@@ -1393,3 +1393,607 @@ browser harness instead.
   passes (`stage=digit`), so a real-device run shows the vote's tally directly.
 - **Sample caveats unchanged**: 45 images, 16 of them synthetic; the genuinely real
   photos number four.
+---
+
+# Round 6 — a 106-image synthetic test set, and where the wall actually is (2026-09-18, no code changes)
+
+The operator's verdict after several rounds of real-device use was *"jeg hadde
+egentlig forventet mer av ocr i 2026 enn det jeg har opplevd hittil i denne
+appen"*. Every earlier accuracy number in this document comes from a set of at
+most 45 images, most of them variants of **one** real label at a small tilt. So
+this round builds a deliberately varied 106-image set, runs the shipped pipeline
+over all of it in a real browser, and reports what it finds — including two
+things the earlier sets could not have shown.
+
+**No committed source file was changed.** `src/ocr.ts` and `src/extract.ts` are
+still at `ac1b1f9`. This is a measurement round, like round 4.
+
+## 37. The test set
+
+106 synthetic lappeliten labels, each a **distinct** Norwegian name and a
+**distinct** valid 8-digit number (first digit 2-9) — 106 different ground
+truths, so nothing here can be an artefact of one label being memorised by the
+tuning of earlier rounds.
+
+Built in two stages, scripts in `scratchpad/ocr6/`:
+
+| script | what it does |
+| --- | --- |
+| `plan.mjs` | the case plan: ground truth + every variety attribute, deterministic seed |
+| `render.mjs` | renders each sticker crisply in real Chromium, fonts embedded as base64 `@font-face` |
+| `compose.mjs` | makes it a photograph: cylindrical warp, rotation, background, exposure, grain, JPEG |
+| `run.mjs` | drives the **actual built app** over all 106, reads the `?debug=1` panel and the confirm fields |
+| `analyze.mjs`, `subsets.mjs`, `dig.mjs`, `agree.mjs` | scoring and breakdowns |
+| `votelab.mjs` | the round-6 experiment in section 42 |
+
+Each label is rendered as a rounded pale sticker (five palettes), three lines —
+`Anne/Nils` / `Toftøy` / `47239791` in the usual shape, with single names,
+slash-joined pairs and double-barrelled surnames mixed in — then composited into
+a **3024x4032** frame and degraded: lens softness, per-pixel sensor grain,
+in-camera sharpening, 4:2:0 JPEG at q78. Handwritten lines also get a small
+per-line tilt and offset, because a person's lines are never parallel.
+
+Distribution (every image carries all six attributes, so each column is the whole
+106):
+
+| dimension | buckets |
+| --- | --- |
+| font | printed 80 (Arimo, Roboto Condensed Bold) / handwriting-style 26 (Patrick Hand 10, Indie Flower 10, Caveat 6) |
+| in-plane rotation | 0-2 deg 46, 3-7 deg 23, 8-13 deg 25, 14-20 deg 12 |
+| lighting | normal 79, low-contrast/worn 12, overexposed 8, underexposed 7 |
+| surface | flat 89, cylindrical wrap 17 (strength 0.35-0.75) |
+| background | clean 75, fabric weave 20, leather grain 11 |
+| label size in frame | near (~58% of width) 42, mid (~34%) 57, far (~19%) 7 |
+
+30 of the 106 are deliberately **easy** — printed, within 2 degrees, normally lit,
+flat — so the set yields a realistic overall number and not only a stress test.
+
+The harness is the round-3/5 pattern unchanged: `vite preview`, real Chromium at
+`/opt/pw-browsers/chromium`, `page.route()` shimming the blocked
+`cdn.jsdelivr.net` from `node_modules/tesseract.js{,-core}` and the cached `nor`
+language data, results read from the `?debug=1` panel and the confirm screen's
+Navn/Telefon inputs.
+
+**One flow change matters for everything below.** The app no longer takes two
+photos: since the auto-send work, the single label photo goes straight to the
+confirm screen. So the early-kickoff overlap that rounds 1-5 relied on to hide
+the pass ladder is **gone** — the debug panel reports `budget=4998ms` on every
+run, i.e. the whole 5s budget is now spent with the user watching. Wall clock
+below is shutter to confirm screen.
+
+## 38. Headline result
+
+```
+106 images, real Chromium, real Tesseract.js WASM, shipped pipeline
+phone-correct 80/106 (75%)   WRONG 11   missing 15   name-exact 75/106 (71%)
+both fields exactly right    66/106
+```
+
+Against round 5's 44/45 (98%) and 36/45 (80%) — but that comparison is only
+meaningful once the set is sliced, because the two sets are not the same
+difficulty:
+
+| subset | n | phone correct | wrong | missing | name exact |
+| --- | --- | --- | --- | --- | --- |
+| printed, <=2 deg, normal light, flat ("easy") | 30 | **30/30 (100%)** | 0 | 0 | 29/30 (97%) |
+| printed, <=7 deg (round-5-comparable difficulty) | 51 | **50/51 (98%)** | 0 | 1 | 45/51 (88%) |
+| all fonts, <=7 deg | 69 | 60/69 (87%) | 6 | 3 | 58/69 (84%) |
+| all fonts, >=8 deg | 37 | 20/37 (54%) | 5 | 12 | 17/37 (46%) |
+| printed only | 80 | 69/80 (86%) | 3 | 8 | 58/80 (73%) |
+| handwriting only | 26 | 11/26 (42%) | 8 | 7 | 17/26 (65%) |
+
+**So round 5's 44/45 was not optimistic for the class of image it measured — it
+was accurate, and reproduces here at 50/51 on the same class.** What it was not
+is representative: that set contained almost no handwriting, no textured
+backgrounds, and only a couple of images past 8 degrees. The 75% headline is the
+price of a set that deliberately over-weights those.
+
+## 39. Where the failures cluster
+
+### By rotation — still the biggest single axis, and the interaction with font is sharp
+
+| rotation | printed | handwriting |
+| --- | --- | --- |
+| 0-2 deg | **36/36 (100%)** | 5/10 (50%) |
+| 3-7 deg | 14/15 (93%) | 5/8 (63%) |
+| 8-13 deg | 14/21 (67%) | 0/4 (0%) |
+| 14-20 deg | 5/8 (63%) | 1/4 (25%) |
+
+Name accuracy falls faster than phone accuracy and falls earlier: printed name
+exact is 35/36 at 0-2 deg, 10/15 at 3-7 deg, 8/21 at 8-13 deg. The reason is
+visible in the failures — at a tilt the two name lines stop being two clean
+lines, and `extract.ts`, which reads the name off the lines adjacent to the
+number, keeps only one of them. Nine of the 31 name failures are exactly that:
+`"Myhre"` for `Ingrid Myhre`, `"Ola/Mats"` for `Ola/Mats Kristiansen`,
+`"Fjeld"` for `Ida Fjeld`. Six more are empty, and the rest are single-character
+errors (`"Tuva Ber"`, `"Mats Emil Toftø"`, `"Live pahl-Olsen"`).
+
+### By lighting — solved, and the earlier rounds are why
+
+| lighting | n | phone correct |
+| --- | --- | --- |
+| normal | 79 | 60 (76%) |
+| low contrast / worn | 12 | 9 (75%) |
+| overexposed | 8 | 5 (63%) |
+| underexposed | 7 | 6 (86%) |
+
+Exposure is **not** a differentiator any more. The paired plain + boosted primary
+passes from round 3 are doing their job; a washed-out sticker is no harder than a
+normal one. This is a real, durable win from the earlier rounds.
+
+### By surface — curvature is still not the problem
+
+| surface | n | phone correct | name exact |
+| --- | --- | --- | --- |
+| flat | 89 | 68 (76%) | 63 (71%) |
+| cylindrical wrap | 17 | 12 (71%) | 12 (71%) |
+
+Even with a genuine barrel warp applied (up to strength 0.75), curved labels
+score within a few points of flat ones, and within the <=7 degree subset they
+are 9/12 against 51/57. Round 4's conclusion — *rotation is the operative
+variable, curvature is not* — survives a test built specifically to break it.
+
+### By background — a new finding, and it is about time, not accuracy
+
+| background | n | phone correct | per-pass OCR (median / max) | wall > 5s |
+| --- | --- | --- | --- | --- |
+| clean | 75 | 60 (80%) | 400ms / 459ms | 9/75 |
+| fabric | 20 | 15 (75%) | 438ms / 1777ms | 6/20 |
+| leather | 11 | 5 (45%) | **2068ms / 3870ms** | **7/11** |
+
+**A single 1280px pass costs 400ms on a clean background and up to 3870ms on a
+leather one.** Same target size, same code path, same 12MP source — the only
+difference is how much the texture gives Tesseract's sparse-text layout analysis
+to chew on. That is a recognition-cost property nobody measured before, because
+no earlier test set had a heavily textured background.
+
+The consequence is severe and is *not* an accuracy ceiling:
+
+```
+L058  leather, overexposed   passes=0   ocrTime=0ms     wall=5486ms  deadlineHit  -> both fields empty
+L064  leather, overexposed   passes=0   ocrTime=0ms     wall=5472ms  deadlineHit  -> both fields empty
+L100  leather, far           passes=1   ocrTime=3866ms  wall=5507ms  deadlineHit  -> phone empty
+L106  leather, far, dark     passes=1   ocrTime=3870ms  wall=5519ms  deadlineHit  -> phone empty
+```
+
+Two images finished **zero** passes inside the budget. The pipeline is not
+failing to read these labels; it is never getting to try. Five of the six
+"never produced any candidate" misses are this.
+
+### By label size
+
+near 35/42 (83%), mid 41/57 (72%), far 4/7 (57%) — distance still costs, but n=7
+for far is too small to lean on, and it is confounded with background (most far
+cases are textured).
+
+## 40. The 11 wrong numbers — the important finding
+
+A wrong number is the failure that matters most: it is plausible, it is what the
+SMS gets addressed to, and the confirm screen only helps if the user actually
+re-reads it. Round 5 had one. This set has eleven, and they are not spread evenly:
+
+```
+WRONG numbers: 11
+  decided in the FAST PATH (1-2 passes, digit vote never ran): 9
+  decided after the vote ran:                                  2
+  differ from the truth by exactly one digit:                  8
+```
+
+Round 5 wrote its own epitaph for this in section 36: *"the one remaining wrong
+number is not reachable by this mechanism — the fast path answers in 2 passes
+with a confidently wrong last digit, so the vote never runs."* On 45 images that
+was one case and reasonably dismissed. On 106 it is **nine of eleven**, and it is
+the single largest correctable defect in the current pipeline.
+
+Nine of the eleven sit on handwriting or curved labels, where a digit's shape is
+ambiguous (`1`/`4`, `6`/`8`, `3`/`9`) but the surrounding word is read
+confidently enough to clear the score gate.
+
+The 15 misses split differently, and mostly benignly:
+
+```
+MISSING: 15
+  the vote ran, its passes disagreed, so the field was blanked: 9   (working as designed)
+  no pass ever produced a candidate:                            6   (all six on textured backgrounds, section 39)
+```
+
+All six sit on a textured background, five of them leather.
+
+The nine blanked ones are the round-5 guard doing exactly what it was built to
+do — refusing rather than guessing. That is the right trade, but it does mean the
+user's experience of a tilted label is now "empty field" rather than "wrong
+number", which is safer and still feels like failure.
+
+## 41. Latency against the 5s budget
+
+```
+wall clock, shutter -> confirm screen (real Chromium)
+  median   960ms      p90 5177ms      max 5519ms
+  min      924ms
+OCR time
+  median   859ms      p90 4677ms      max 4966ms
+passes: median 2   max 14
+over 5000ms: 22/106        deadline truncated OCR: 11/106
+```
+
+Split by which path the image took:
+
+```
+fast path, no vote (82 images; 76 of them in exactly 2 passes)
+                                           median wall  948ms   max 5519ms
+tail (vote ran, 24 images)                 median wall 5080ms   max 5517ms
+```
+
+Two things to say plainly:
+
+- **The common case is fast and has not regressed** — ~950ms, in line with round
+  3's 919ms and round 5's ~845ms.
+- **The tail now costs the user the entire budget, visibly.** Before the
+  single-photo flow, the ladder ran while the user framed the second photo; the
+  debug panel now reports `budget=4998ms` every time, meaning zero of the budget
+  had already elapsed at the shutter. 22 of 106 photos ended in a ~5.5s wait, and
+  11 had their OCR cut off by the deadline. On a phone, which is slower than this
+  desktop Chromium, that fraction will be larger.
+
+A 12-image re-run of the timing-sensitive cases reproduced **all 12** phone
+verdicts and all the zero/one-pass outcomes, so these are structural, not noise.
+
+## 42. Measured: would voting on the fast path too have fixed it?
+
+This is the round-4-style experiment for the section 40 finding, run in real
+Chromium with the shipped preprocessing parameters (1280px, gain 1.8 / bias -60,
+PSM 11, whitelist `0123456789`), the shipped vote angles `[-12,-8,-4,4,8]` and the
+shipped tie-break rule (>=2 votes, no tie, abstention keeps the ladder's answer):
+`scratchpad/ocr6/votelab.mjs`.
+
+Applied to the 9 fast-path wrong cases, and — importantly — to 30 cases the fast
+path currently gets **right**, because the risk of voting everywhere is breaking
+those:
+
+| group | n | before | after |
+| --- | --- | --- | --- |
+| fast-path WRONG | 9 | 0 correct, 9 wrong, 0 empty | **4 correct, 1 wrong, 4 empty** |
+| fast-path CORRECT (controls) | 30 | 30 correct | **30 correct, 0 wrong, 0 empty** |
+
+Cost: **+1253ms median, +1772ms max** for the five extra recognitions.
+
+So voting on every photo would take the whole set from 11 wrong to 3 wrong and
+80 correct to 84 correct, with no measured regression in 30 controls — at the
+price of roughly doubling the median wait, from ~960ms to ~2.2s, in a flow where
+the user is now watching that wait.
+
+**A cheaper trigger exists, and it is already in the data.** Both primary passes
+(plain and boosted) always run today. Tallying whether they read the *same*
+8-digit candidate, parsed out of the `?debug=1` panel of the main run:
+
+| what the two primary passes did | n | correct | WRONG | missing |
+| --- | --- | --- | --- | --- |
+| read the **same** number | 56 | 54 | **2** | 0 |
+| read **different** numbers | 8 | 1 | **6** | 1 |
+| only one of them read a number | 20 | 15 | **3** | 2 |
+| neither read a number | 22 | 10 | 0 | 12 |
+
+Agreement between the two primaries is a strong correctness signal (54/56), and
+disagreement is a strong *wrongness* signal (6 of 8). Voting only when they fail
+to agree on the same number would run the vote on **28 of 106 photos (26%)** and
+cover **9 of the 11 wrong numbers**, leaving the other 74% — including every easy
+case — at today's ~960ms.
+
+(Caveat on that parse: the debug panel truncates each pass's text at 120
+characters, which affected 7 of 313 parsed pass lines, all on leather or fabric
+backgrounds. It can only under-count numbers, so the "neither read a number"
+bucket is slightly overstated.)
+
+## 43. So — has Tesseract.js hit its ceiling here?
+
+Not one ceiling. Four different regimes, and they need different answers:
+
+**1. Printed label, roughly upright — solved, and not the complaint.** 36/36 at
+0-2 degrees, 50/51 within 7 degrees, across normal, worn, overexposed,
+underexposed, flat, curved, clean and fabric. There is nothing left to win here
+and no engine change would show up.
+
+**2. Rotation past ~8 degrees — not a ceiling, but the current mechanism is
+expensive and often ends empty.** 54% phone, and 12 of the 15 missing numbers.
+Round 4 established *why* this is hard (Tesseract's line segmentation is chaotic
+under tilt, not smoothly degrading) and round 5's vote is the right shape of
+answer; what this set shows is that the vote is attached to the wrong trigger and
+that the ladder that precedes it costs 4-5s to usually fail. The capture hint
+("hold telefonen slik at teksten står vannrett") remains the cheapest real fix
+and is already shipped.
+
+**3. Handwriting — this one is a genuine engine ceiling.** 11/26 phone correct,
+and 8 of the 11 wrong numbers. Tesseract's LSTM is trained on printed document
+text; the three handwriting fonts here are *clean, evenly spaced, high-contrast*
+renderings, far tidier than an actual pen on an actual sticker, and it still
+reads under half of them. No preprocessing parameter fixes a model that was not
+trained on the glyph shapes. If real users write labels by hand, this is the gap
+they are feeling, and it is not closable with Tesseract.
+
+**4. Textured background — a latency ceiling, not an accuracy one, and it looks
+fixable.** 2068ms median per pass on leather against 400ms on a clean background,
+two images completing zero passes inside 5s. Nothing here says Tesseract *cannot*
+read those labels; it says the budget is being spent on the background. A
+region-of-interest crop before recognition is the obvious lever, and round 4
+already noted that ROI detection is the prerequisite it did not want to build. It
+would now pay for itself twice — accuracy on the tail and latency on texture.
+**This needs its own measurement round; I am reporting the problem, not a
+solution.**
+
+### And the honest part about the alternative
+
+**A cloud vision model would do meaningfully better than this, on exactly the
+cases the operator is complaining about.** Handwritten labels, labels at 10-20
+degrees, and labels on a busy background are ordinary photographs, which is what
+those models are trained on, and they would not care about any of the four
+regimes above. I do not think that is a close call, and I do not want to
+soft-pedal it after five rounds of client-side tuning: the remaining tail is the
+part a 2026 vision model finds easy and a 2010s document-OCR engine finds hard.
+
+The cost of taking it is exactly what rounds 1 and 4 described and nothing has
+changed: it needs a serverless proxy to hold an API key (a key shipped in
+client-side JavaScript on GitHub Pages is a key given away), it ends the "photos
+never leave the phone" property that was a deliberate choice, it costs a fraction
+of a cent per photo forever, and on mobile data it is *slower* than the ~960ms
+the fast path achieves today. The sensible shape, if the operator wants it, is
+the hybrid round 4 sketched — client pipeline first, server only when the client
+produces no confident number — which is now easy to trigger well, because section
+42 shows the pipeline can tell when it is unsure.
+
+### What I would do first, if the operator wants client-side only
+
+Ranked by measured evidence, and none of it implemented here:
+
+1. **Trigger the digit vote on primary disagreement** (section 42). Covers 9 of
+   11 wrong numbers, 0 regressions in 30 controls, and costs its ~1.25s on 26% of
+   photos instead of all of them. Risk: the two non-covered wrong numbers were
+   cases where both primaries agreed on the same wrong value, so this does not
+   eliminate the class.
+2. **Measure and attack the texture latency** (section 39). It is currently
+   costing whole images, not digits, and it is the cause of the worst waits.
+3. **Reconsider the ladder's cost now that nothing overlaps it** (section 41).
+   Round 5 already flagged that the refinement passes exist only for the name now
+   that the vote owns the number; with the second photo gone, five refinement
+   passes before the vote is a very expensive way to reach a vote that is usually
+   the thing that answers.
+4. **Accept that handwriting is out of reach client-side** and either say so in
+   the UI or route it to a vision model.
+
+## 44. Residual risk and what this round does not show
+
+- **Every image is synthetic.** The labels are rendered, the warp, grain, blur
+  and exposure are simulated, and the "handwriting" is three fonts, not a pen.
+  The degradation model is my own; if it is unrealistic in some direction, the
+  numbers move with it. What the set *is* good for is relative comparison across
+  its own dimensions, which is what sections 39-42 lean on.
+- **106 distinct labels removes the one-label risk of earlier rounds** but
+  introduces its own: the name and number pools are drawn from fixed lists, so
+  glyph coverage is not uniform (`ø`, `æ`, `å` appear often, which is realistic
+  for Norwegian but stresses those glyphs specifically).
+- **Still desktop Chromium, not an iPhone.** Every latency figure here is a lower
+  bound for the device. The 22/106 over 5s will be worse on a phone.
+- **The vote experiment's controls are 30 of 76 fast-path-correct cases**, not
+  all of them; a regression in the other 46 is not ruled out, though 30/30 with
+  zero changes is a strong signal.
+- **The primary-agreement trigger is measured on this set only**, and its two
+  uncovered wrong numbers (`L078`, `L091`) show the failure mode it cannot see:
+  both primaries confidently agreeing on the same wrong digit.
+- The reported numbers are reproducible: a 12-case re-run of the timing-sensitive
+  images reproduced all 12 phone verdicts.
+
+---
+
+# Round 7 — the vote's trigger widened, measured against a same-session baseline (2026-09-18/19)
+
+Round 6 ended with a ranked list of what to do next and implemented none of it.
+This round implements its first item — *trigger the digit vote on primary-pass
+disagreement* — and re-measures the whole 106-image set in a real browser, twice:
+once with the shipped code and once with the change, back to back on the same
+machine in the same session.
+
+Two commits' worth of change, both in this round:
+
+- `src/ocr.ts` — a new exported `shouldVoteOnDigits`, and stage 4 of `runOcr`
+  consulting it instead of `!settledInFastPath` alone.
+- `src/main.ts` — comments only: `RESULT_DEADLINE_MS` and `startNoteOcr` were
+  still describing a two-photo flow that has not existed since `89841d8`.
+
+## 45. Why a same-session baseline, and not round 6's stored numbers
+
+The first smoke run of the changed build came back at `wall=1388ms` on `L001`,
+against round 6's `964ms` for the same image and the same code path. Nothing in
+the change touches `L001` — both primaries agree on it, so it never votes. The
+machine is simply slower today.
+
+So the whole 106 was run twice: the committed code at `bc080f7` (built from
+`git show HEAD:gjenglemt/src/{ocr,main}.ts` into a separate `vite preview`) and
+the changed code, sequentially, same Chromium, same shim, same images.
+
+```
+                    phone       WRONG  missing  name        wall median  over5s  cut
+round 6 (stored)    80/106 75%    11     15     75/106 71%     960ms      22     11
+round 7 BASELINE    79/106 75%    11     16     75/106 71%    1434ms      20     13
+```
+
+**The baseline reproduces round 6 on 105 of 106 phone verdicts, and on all 11
+wrong numbers by id** (`L042 L067 L070 L071 L072 L074 L078 L090 L091 L093 L102`).
+The single difference is `L011`, correct in round 6 and lost to the deadline here
+— which is the point: the same code on the same image is 49% slower today
+(median 1434ms against 960ms) and truncates 13 instead of 11. Comparing the
+changed build against round 6's stored numbers would have charged that to the
+change. Every before/after number below is baseline-vs-changed from this session.
+
+## 46. Result: 11 wrong numbers down to 6, with no regression
+
+```
+                    phone       WRONG  missing  name        both   vote ran
+round 7 BASELINE    79/106 75%    11     16     75/106 71%   65     24/106
+round 7 CHANGED     82/106 77%     6     18     75/106 71%   67     43/106
+```
+
+Every phone-verdict transition, all 106:
+
+| transition | n | ids |
+| --- | --- | --- |
+| correct -> correct | 79 | — |
+| WRONG -> correct | 2 | `L042` `L074` |
+| WRONG -> empty | 3 | `L067` `L072` `L093` |
+| WRONG -> WRONG | 6 | `L070` `L071` `L078` `L090` `L091` `L102` |
+| empty -> correct | 1 | `L011` |
+| empty -> empty | 15 | — |
+
+**correct -> WRONG: 0. correct -> empty: 0.** Round 6's vote experiment held its
+30 controls; this run holds all 79 of them. Name accuracy is identical at 75/106
+with no name changing at all in either direction, which is expected — the digit
+passes carry no letters and cannot become the text a name is read from.
+
+The three newly-empty fields were all **wrong numbers before**, one digit off
+each (`59692164` for `59699164`, `84576463` for `84576163`, `43853744` for
+`43853794`). That is the round-5 guard behaving as designed: the vote's passes
+read values, disagreed, and the field was blanked rather than shipped. An empty
+Telefon field stops the auto-send (see `bc080f7`) and the user types 8 digits;
+a wrong one addresses the SMS to a stranger.
+
+### The six that are still wrong
+
+| id | truth | read | why the trigger did not catch it |
+| --- | --- | --- | --- |
+| `L078` | 35246179 | 35246479 | both primaries read the same wrong number — the failure mode round 6 named |
+| `L091` | 47896189 | 47896199 | same |
+| `L090` | 37569739 | 23569739 | vote ran, 5 passes, all abstained -> ladder's answer stands |
+| `L071` | 96770893 | 16770893 | vote already ran in the baseline; unchanged |
+| `L070` | 68837383 | 68832323 | vote already ran; deadline cut it at 13 passes |
+| `L102` | 86539787 | 86539737 | **vote never ran: the image hit the deadline first** |
+
+`L102` is the one worth flagging. Round 6's `votelab` predicted it as a fix
+(`86539787` on 3 of 5 angles, +1439ms). In the real pipeline it never gets the
+chance: leather background, label far in frame, one 3.9s pass, `wall=5469ms`,
+`deadlineHit=true` before stage 4 is reached. This is round 6 section 43's
+texture-latency problem, not a defect in the trigger — the budget is spent on the
+background before the number is ever voted on. Four of the eleven original wrong
+numbers sit on handwriting, which round 6 called an engine ceiling.
+
+## 47. "Only one primary read a number" is not agreement — the data, not the phrasing
+
+The obvious reading of "vote when the primaries disagree" is to vote only when
+both read a number and the numbers differ. Round 6's own figure of *9 of 11 wrong
+numbers covered, 26% of photos* does not come from that rule: `agree.mjs` counts
+`{disagree, onlyOne}`, i.e. 8 + 20 = 28 photos = 26%, and 6 + 3 = 9 wrong. The
+strict reading covers 8 photos and 6 wrong numbers.
+
+Round 6's buckets, with their wrong rates:
+
+| the two primary passes | n | correct | WRONG | missing | wrong rate |
+| --- | --- | --- | --- | --- | --- |
+| read the same number | 56 | 54 | 2 | 0 | **3.6%** |
+| read different numbers | 8 | 1 | 6 | 1 | 75% |
+| only one read a number | 20 | 15 | 3 | 2 | **15%** |
+| neither read a number | 22 | 10 | 0 | 12 | 0% |
+
+So "only one read a number" is four times likelier to be wrong than real
+agreement, and holds 3 of the 11 wrong numbers. `shouldVoteOnDigits` therefore
+skips the vote **only** on real agreement: two passes that both ran and read the
+same number.
+
+Measured, that is exactly what happened. The vote newly ran on 19 images:
+
+```
+newly voting: 19 (18% of the set)   11 onlyOne + 6 disagree + 2 neither
+of those 19: 2 wrong -> correct, 3 wrong -> empty, 14 unchanged (all correct)
+```
+
+The 11 `onlyOne` images cost 11 extra vote sweeps and bought one wrong number
+removed (`L093`), with zero regressions among the other ten. On the strict
+reading the set would have ended at 7 wrong instead of 6. It is the marginal
+half of the change, and it is reported here as marginal rather than as a win.
+
+(Note `L061` voted although the debug-panel parse puts it in `agree`: the panel
+truncates each pass's text at 120 characters, so the parse under-reads numbers on
+long noisy lines. The running code compares the passes' full text, so it is the
+panel that is approximate here, not the trigger.)
+
+## 48. The 5s deadline: the comment was lying, the budget is not the problem
+
+Round 6 found the deadline's stated rationale stale, and it was. The comment
+above `RESULT_DEADLINE_MS` said recognition starts at the shutter "so it overlaps
+whatever render/analyze plumbing runs next", a survival of the two-photo flow in
+which the ladder ran while the user framed the second photo. Since `89841d8`
+there is no second photo: `analyze()` is called in the same tick as the capture
+handler, and the debug panel reports `budget=4998ms` on essentially every run.
+The head start now buys single-digit milliseconds. The comment now says that,
+and says plainly that the 5s is a stated requirement rather than a tuning knob.
+
+**The deadline's value is unchanged and was never a candidate for change.**
+
+What round 6 asked to be checked is whether the widened trigger pushes
+meaningfully more images past it. Measured, same session, same machine:
+
+```
+                       over 5s      deadline-truncated     wall median
+round 7 BASELINE       20/106            13/106               1434ms
+round 7 CHANGED        24/106            14/106               1465ms
+```
+
+**Net +1 truncated image, and the median wait moved 31ms**, because 63 of 106
+photos never vote at all and answer in 959ms. The churn underneath is small and
+benign:
+
+- newly truncated: `L060` (correct -> correct), `L097` (correct -> correct),
+  `L070` (wrong -> wrong). **None lost its answer**, because `analyze()` falls
+  back to `PendingOcr.partial()`, which holds the best-scoring name-bearing pass
+   — normally the primary that read the number.
+- no longer truncated: `L011` (empty -> correct), `L043` (correct -> correct).
+
+Where the cost lands is the 19 newly-voting images: median wall 1425ms -> 3072ms,
+i.e. +1677ms median and +3520ms worst case, in line with round 6's +1253ms
+estimate for five extra recognitions. Those are, by construction, the photos
+where the pipeline has told us it is unsure.
+
+So: **the vote was not made cheaper, and on this evidence does not need to be.**
+Fewer angles or a smaller `maxDim` would trade away the mechanism's accuracy to
+buy a millisecond budget that the measurement says is not under pressure. The one
+case that argues for it — `L102`, where the vote never ran because a single pass
+cost 3.9s on leather — is not fixed by making the vote cheaper either; it is
+round 6's ROI/texture item, and it needs its own round.
+
+## 49. Verification and residual risk
+
+```
+$ npx tsc --noEmit          # clean
+$ npx vitest run            # Test Files 5 passed, Tests 55 passed (was 49)
+$ npm run build             # ✓ built
+$ node run7.mjs (106 images x2, real Chromium + real Tesseract.js WASM)
+```
+
+`npm run smoke` **fails, and already failed before this round's changes.** It
+asserts the capture screen's *first* button reads "Ta bilde av lappen", which
+stopped being true at `4fd054d`, where `renderCaptureScreen` gained a proactive
+"Hent sted" button above it. Verified by running the same script against
+`HEAD:gjenglemt/src/main.ts` built in isolation: identical failure, same message.
+Nothing in this round touches `renderCaptureScreen`. Left alone deliberately —
+it is a stale assertion in a smoke script, unrelated to OCR, and fixing it inside
+an OCR commit would bury it.
+
+`ocr.test.ts` gains 6 tests for the trigger itself (`shouldVoteOnDigits`),
+separate from the 8 that cover `pickVotedValue`'s tallying: agreement skips the
+vote; different numbers vote; one number only votes; a probe-settled fast path
+votes; a failed fast path votes (the pre-existing behaviour, guarded against
+regression); and fewer than two primaries having run votes.
+
+Residual risk, honestly:
+
+- **Both primaries agreeing on the same wrong number is untouched** (`L078`,
+  `L091`). Round 6 predicted exactly this and it reproduced. Nothing cheap
+  addresses it; voting on every photo would, at +1253ms on every capture.
+- **The tail's slowest images can no longer reach the vote at all.** `L102`
+  shows the ordering problem: on a textured background the ladder can spend the
+  whole budget before stage 4. Round 6's ROI-crop item would fix the cause.
+- **Blanking is now more common** — 15 missing to 18. Three of those three were
+  wrong numbers, which is the trade this pipeline has chosen since round 5, but
+  it does mean "empty field" is what a hard label looks like more often.
+- **The `onlyOne` half of the trigger is worth one image on this set.** It is
+  justified by a 15% wrong rate against 3.6%, not by its measured yield.
+- **Still desktop Chromium and still 106 synthetic labels.** Every latency
+  figure is a lower bound for a phone, and this session's machine was already
+  49% slower than round 6's — the same code truncated 13 images here against 11
+  there, before any change.
