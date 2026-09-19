@@ -1,0 +1,2512 @@
+[
+ {
+  "id": "R008",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "60728412",
+  "name": "Jonas Nordmann",
+  "shipped": "empty",
+  "capPxAt1280": 8.5,
+  "roi": [
+   1702,
+   2073,
+   2050,
+   2306
+  ],
+  "wordH": 28.34999999999991,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "60728412"
+    ],
+    "ms": 153,
+    "w": 196,
+    "h": 131,
+    "scale": 0.56,
+    "text": "Jonas Nordmann 60728412"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "60728412"
+    ],
+    "ms": 88,
+    "w": 246,
+    "h": 164,
+    "scale": 0.71,
+    "text": "Jonas Nordmann 60728412"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "60728412"
+    ],
+    "ms": 92,
+    "w": 295,
+    "h": 197,
+    "scale": 0.85,
+    "text": "Jonas Nordmann 60728412"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "60728412"
+    ],
+    "ms": 91,
+    "w": 368,
+    "h": 247,
+    "scale": 1.06,
+    "text": "Jonas Nordmann 60728412"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "60728412"
+    ],
+    "ms": 85,
+    "w": 246,
+    "h": 164,
+    "scale": 0.71,
+    "text": "Jonas Nordmann 60728412"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "60728412"
+    ],
+    "ms": 90,
+    "w": 295,
+    "h": 197,
+    "scale": 0.85,
+    "text": "Jonas Nordmann 60728412"
+   }
+  }
+ },
+ {
+  "id": "R024",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "28908715",
+  "name": "Aksel/Vilde Berg-Hansen",
+  "shipped": "empty",
+  "capPxAt1280": 8,
+  "roi": [
+   1574,
+   1877,
+   1976,
+   2088
+  ],
+  "wordH": 34.65000000000009,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "28908715"
+    ],
+    "ms": 76,
+    "w": 186,
+    "h": 97,
+    "scale": 0.46,
+    "text": "Aksel/vilde Berg-Hansen 28908715"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "28908715"
+    ],
+    "ms": 80,
+    "w": 232,
+    "h": 122,
+    "scale": 0.58,
+    "text": "Aksel/Vilde Berg-Hansen 28908715"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "28908715"
+    ],
+    "ms": 85,
+    "w": 278,
+    "h": 146,
+    "scale": 0.69,
+    "text": "Aksel/Vilde Berg-Hansen 28908715"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "28908715"
+    ],
+    "ms": 94,
+    "w": 348,
+    "h": 183,
+    "scale": 0.87,
+    "text": "Aksel/vilde Berg-Hansen 28908715"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "28908715"
+    ],
+    "ms": 76,
+    "w": 232,
+    "h": 122,
+    "scale": 0.58,
+    "text": "Aksel/Vilde Berg-Hansen 28908715"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "28908715"
+    ],
+    "ms": 87,
+    "w": 278,
+    "h": 146,
+    "scale": 0.69,
+    "text": "Aksel/Vilde Berg-Hansen 28908715"
+   }
+  }
+ },
+ {
+  "id": "R075",
+  "dist": "far",
+  "background": "fabric",
+  "truth": "44880901",
+  "name": "Ola/Odd Berg",
+  "shipped": "empty",
+  "capPxAt1280": 13.2,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R076",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "35760781",
+  "name": "Jakob Lie",
+  "shipped": "empty",
+  "capPxAt1280": 8.2,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R084",
+  "dist": "far",
+  "background": "fabric",
+  "truth": "37182693",
+  "name": "Håkon/Ida Toftøy",
+  "shipped": "empty",
+  "capPxAt1280": 13.6,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R086",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "42549042",
+  "name": "Nils Marte Rønning",
+  "shipped": "empty",
+  "capPxAt1280": 8.5,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R087",
+  "dist": "near",
+  "background": "clean",
+  "truth": "20968261",
+  "name": "Ola Lie",
+  "shipped": "empty",
+  "capPxAt1280": 34.4,
+  "roi": [
+   1241,
+   1723,
+   1827,
+   2243
+  ],
+  "wordH": 81.89999999999986,
+  "by": {
+   "16": {
+    "hit": false,
+    "cands": [],
+    "ms": 53,
+    "w": 117,
+    "h": 104,
+    "scale": 0.2,
+    "text": "Ola Lie 96826"
+   },
+   "20": {
+    "hit": false,
+    "cands": [],
+    "ms": 56,
+    "w": 143,
+    "h": 127,
+    "scale": 0.24,
+    "text": "Ola Lie )96826"
+   },
+   "24": {
+    "hit": false,
+    "cands": [],
+    "ms": 57,
+    "w": 172,
+    "h": 152,
+    "scale": 0.29,
+    "text": "Ola Lie 96826"
+   },
+   "30": {
+    "hit": false,
+    "cands": [],
+    "ms": 66,
+    "w": 215,
+    "h": 190,
+    "scale": 0.37,
+    "text": "Ola Lie )96826"
+   },
+   "20:plain": {
+    "hit": false,
+    "cands": [],
+    "ms": 60,
+    "w": 143,
+    "h": 127,
+    "scale": 0.24,
+    "text": "Ola Lie )96826"
+   },
+   "24:plain": {
+    "hit": false,
+    "cands": [],
+    "ms": 60,
+    "w": 172,
+    "h": 152,
+    "scale": 0.29,
+    "text": "Ola Lie )96826"
+   }
+  }
+ },
+ {
+  "id": "R088",
+  "dist": "mid",
+  "background": "fabric",
+  "truth": "43136982",
+  "name": "Ola Myhre",
+  "shipped": "WRONG",
+  "capPxAt1280": 20.9,
+  "roi": [
+   1109,
+   1566,
+   1811,
+   2287
+  ],
+  "wordH": 88.20000000000005,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "43136982"
+    ],
+    "ms": 47,
+    "w": 140,
+    "h": 144,
+    "scale": 0.2,
+    "text": "Ola Myhre 43136982"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "43136982"
+    ],
+    "ms": 56,
+    "w": 159,
+    "h": 163,
+    "scale": 0.23,
+    "text": "| | | Myhre | 43136982"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "43136982"
+    ],
+    "ms": 50,
+    "w": 191,
+    "h": 196,
+    "scale": 0.27,
+    "text": "| Myhre 43136982"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "43136982"
+    ],
+    "ms": 58,
+    "w": 239,
+    "h": 245,
+    "scale": 0.34,
+    "text": "Ola Myhre 43136982"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "43136982"
+    ],
+    "ms": 48,
+    "w": 159,
+    "h": 163,
+    "scale": 0.23,
+    "text": "Ola Myhre 43136982"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "43136982"
+    ],
+    "ms": 52,
+    "w": 191,
+    "h": 196,
+    "scale": 0.27,
+    "text": "Ola Myhre 43136982"
+   }
+  }
+ },
+ {
+  "id": "R091",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "21948503",
+  "name": "Odd Kristiansen",
+  "shipped": "empty",
+  "capPxAt1280": 7.8,
+  "roi": [
+   646,
+   1159,
+   970,
+   1348
+  ],
+  "wordH": 37.799999999999955,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "21948503"
+    ],
+    "ms": 43,
+    "w": 137,
+    "h": 80,
+    "scale": 0.42,
+    "text": "Odd Kristiansen 21948503"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "21948503"
+    ],
+    "ms": 54,
+    "w": 171,
+    "h": 100,
+    "scale": 0.53,
+    "text": "Odd Kristiansen 21948503"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "21948503"
+    ],
+    "ms": 60,
+    "w": 206,
+    "h": 120,
+    "scale": 0.63,
+    "text": "Odd Kristiansen 21948503"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "21948503"
+    ],
+    "ms": 59,
+    "w": 257,
+    "h": 150,
+    "scale": 0.79,
+    "text": "Odd Kristiansen 21948503"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "21948503"
+    ],
+    "ms": 52,
+    "w": 171,
+    "h": 100,
+    "scale": 0.53,
+    "text": "Odd Kristiansen 21948503"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "21948503"
+    ],
+    "ms": 61,
+    "w": 206,
+    "h": 120,
+    "scale": 0.63,
+    "text": "Odd Kristiansen 21948503"
+   }
+  }
+ },
+ {
+  "id": "R093",
+  "dist": "mid",
+  "background": "clean",
+  "truth": "31633942",
+  "name": "Frida/Tuva Solheim",
+  "shipped": "empty",
+  "capPxAt1280": 20.7,
+  "roi": [
+   1266,
+   2448,
+   1957,
+   2615
+  ],
+  "wordH": 25.199999999999818,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "31633942"
+    ],
+    "ms": 161,
+    "w": 439,
+    "h": 106,
+    "scale": 0.63,
+    "text": "Frida/Tuva Solheim 31633942"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "31633942"
+    ],
+    "ms": 184,
+    "w": 548,
+    "h": 133,
+    "scale": 0.79,
+    "text": "Fridas/Tuva Solheim 31633942"
+   },
+   "24": {
+    "hit": false,
+    "cands": [],
+    "ms": 211,
+    "w": 658,
+    "h": 159,
+    "scale": 0.95,
+    "text": "Frida/Tuva Solheim 316339-—-12"
+   },
+   "30": {
+    "hit": false,
+    "cands": [],
+    "ms": 218,
+    "w": 823,
+    "h": 199,
+    "scale": 1.19,
+    "text": "Frida/Tuva Solheim 316339-12"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "31633942"
+    ],
+    "ms": 197,
+    "w": 548,
+    "h": 133,
+    "scale": 0.79,
+    "text": "Frida/Tuva Solheim 31633942"
+   },
+   "24:plain": {
+    "hit": false,
+    "cands": [],
+    "ms": 213,
+    "w": 658,
+    "h": 159,
+    "scale": 0.95,
+    "text": "Frida/Tuva Solheim 316339-12"
+   }
+  }
+ },
+ {
+  "id": "R096",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "61715110",
+  "name": "Even Hauge",
+  "shipped": "empty",
+  "capPxAt1280": 8.2,
+  "roi": [
+   1008,
+   1380,
+   1181,
+   1559
+  ],
+  "wordH": 25.200000000000045,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "61715110"
+    ],
+    "ms": 37,
+    "w": 110,
+    "h": 114,
+    "scale": 0.63,
+    "text": "Even Hauge 61715110"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "61715110"
+    ],
+    "ms": 40,
+    "w": 137,
+    "h": 142,
+    "scale": 0.79,
+    "text": "Even Hauge 61715110"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "61715110"
+    ],
+    "ms": 42,
+    "w": 165,
+    "h": 170,
+    "scale": 0.95,
+    "text": "Even Hauge 61715110"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "61715110"
+    ],
+    "ms": 45,
+    "w": 206,
+    "h": 213,
+    "scale": 1.19,
+    "text": "Even Hauge 61715110"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "61715110"
+    ],
+    "ms": 41,
+    "w": 137,
+    "h": 142,
+    "scale": 0.79,
+    "text": "Even Hauge 61715110"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "61715110"
+    ],
+    "ms": 47,
+    "w": 165,
+    "h": 170,
+    "scale": 0.95,
+    "text": "Even Hauge 61715110"
+   }
+  }
+ },
+ {
+  "id": "R108",
+  "dist": "mid",
+  "background": "clean",
+  "truth": "47654625",
+  "name": "Håkon/Tuva Nordmann",
+  "shipped": "empty",
+  "capPxAt1280": 22.6,
+  "roi": [
+   989,
+   1147,
+   1544,
+   1572
+  ],
+  "wordH": 85.04999999999995,
+  "by": {
+   "16": {
+    "hit": false,
+    "cands": [
+     "41654625"
+    ],
+    "ms": 43,
+    "w": 111,
+    "h": 85,
+    "scale": 0.2,
+    "text": "Håkon/Tuyg Nordmann 41654625"
+   },
+   "20": {
+    "hit": false,
+    "cands": [
+     "41654625"
+    ],
+    "ms": 55,
+    "w": 131,
+    "h": 100,
+    "scale": 0.24,
+    "text": "påkon/T uvg Nordmann 41654625"
+   },
+   "24": {
+    "hit": false,
+    "cands": [
+     "41654625"
+    ],
+    "ms": 46,
+    "w": 157,
+    "h": 120,
+    "scale": 0.28,
+    "text": "påkon/Tuyg jordman, 41654625"
+   },
+   "30": {
+    "hit": false,
+    "cands": [],
+    "ms": 55,
+    "w": 196,
+    "h": 150,
+    "scale": 0.35,
+    "text": "Håkon/Tuyg ordmann 14165462 N"
+   },
+   "20:plain": {
+    "hit": false,
+    "cands": [
+     "41654625"
+    ],
+    "ms": 46,
+    "w": 131,
+    "h": 100,
+    "scale": 0.24,
+    "text": "påkon/Tuyg Nordman 41654625"
+   },
+   "24:plain": {
+    "hit": false,
+    "cands": [
+     "41765462"
+    ],
+    "ms": 50,
+    "w": 157,
+    "h": 120,
+    "scale": 0.28,
+    "text": "påkon/Tuyg jordman, 41765462"
+   }
+  }
+ },
+ {
+  "id": "R111",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "76745299",
+  "name": "Lars Toftøy",
+  "shipped": "empty",
+  "capPxAt1280": 8,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R116",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "25488518",
+  "name": "Jonas Toftøy",
+  "shipped": "WRONG",
+  "capPxAt1280": 7.8,
+  "roi": [
+   967,
+   1531,
+   1156,
+   1692
+  ],
+  "wordH": 25.199999999999818,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "25488518"
+    ],
+    "ms": 54,
+    "w": 120,
+    "h": 102,
+    "scale": 0.63,
+    "text": "Jonas Toftøy 25488518"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "25488518"
+    ],
+    "ms": 52,
+    "w": 150,
+    "h": 128,
+    "scale": 0.79,
+    "text": "Jonas Toftøy 25488518"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "25488518"
+    ],
+    "ms": 56,
+    "w": 180,
+    "h": 153,
+    "scale": 0.95,
+    "text": "Jonas Toftøy 25488518"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "25488518"
+    ],
+    "ms": 60,
+    "w": 225,
+    "h": 192,
+    "scale": 1.19,
+    "text": "Jonas Toftøy 25488518"
+   },
+   "20:plain": {
+    "hit": false,
+    "cands": [
+     "95488518"
+    ],
+    "ms": 56,
+    "w": 150,
+    "h": 128,
+    "scale": 0.79,
+    "text": "Jonas Toftøy 95488518"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "25488518"
+    ],
+    "ms": 60,
+    "w": 180,
+    "h": 153,
+    "scale": 0.95,
+    "text": "Jonas Toftøy 25488518"
+   }
+  }
+ },
+ {
+  "id": "R119",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "39618920",
+  "name": "Nils/Jonas Hauge",
+  "shipped": "empty",
+  "capPxAt1280": 8,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R122",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "43427162",
+  "name": "Iver Solheim",
+  "shipped": "empty",
+  "capPxAt1280": 8.2,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ },
+ {
+  "id": "R128",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "31986304",
+  "name": "Thea Henrik Vik",
+  "shipped": "WRONG",
+  "capPxAt1280": 7.8,
+  "roi": [
+   1301,
+   1688,
+   1710,
+   1994
+  ],
+  "wordH": 53.55000000000018,
+  "by": {
+   "16": {
+    "hit": false,
+    "cands": [
+     "31596304"
+    ],
+    "ms": 38,
+    "w": 122,
+    "h": 91,
+    "scale": 0.3,
+    "text": "mea Henri, Vik 31596304"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "31986304"
+    ],
+    "ms": 43,
+    "w": 153,
+    "h": 114,
+    "scale": 0.37,
+    "text": "Thea Henrik i 31986304"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "31986304"
+    ],
+    "ms": 43,
+    "w": 183,
+    "h": 137,
+    "scale": 0.45,
+    "text": "Thea Henrik 31986304"
+   },
+   "30": {
+    "hit": false,
+    "cands": [
+     "31956304"
+    ],
+    "ms": 44,
+    "w": 229,
+    "h": 171,
+    "scale": 0.56,
+    "text": "Thea fenrik 31956304"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "31986304"
+    ],
+    "ms": 45,
+    "w": 153,
+    "h": 114,
+    "scale": 0.37,
+    "text": "Thea Henrik i 31986304"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "31986304"
+    ],
+    "ms": 45,
+    "w": 183,
+    "h": 137,
+    "scale": 0.45,
+    "text": "Thea Henrik 31986304"
+   }
+  }
+ },
+ {
+  "id": "R001",
+  "dist": "near",
+  "background": "clean",
+  "truth": "71407358",
+  "name": "Henrik Rønning",
+  "shipped": "correct",
+  "capPxAt1280": 36,
+  "roi": [
+   1017,
+   2013,
+   2303,
+   3125
+  ],
+  "wordH": 144.89999999999964,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "71407358"
+    ],
+    "ms": 71,
+    "w": 257,
+    "h": 222,
+    "scale": 0.2,
+    "text": "Henrik Rønning 71407358"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "71407358"
+    ],
+    "ms": 66,
+    "w": 257,
+    "h": 222,
+    "scale": 0.2,
+    "text": "Henrik Rønning 71407358"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "71407358"
+    ],
+    "ms": 71,
+    "w": 257,
+    "h": 222,
+    "scale": 0.2,
+    "text": "Henrik Rønning 71407358"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "71407358"
+    ],
+    "ms": 79,
+    "w": 266,
+    "h": 230,
+    "scale": 0.21,
+    "text": "Henrik Rønning 71407358"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "71407358"
+    ],
+    "ms": 74,
+    "w": 257,
+    "h": 222,
+    "scale": 0.2,
+    "text": "Henrik Rønning 71407358"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "71407358"
+    ],
+    "ms": 78,
+    "w": 257,
+    "h": 222,
+    "scale": 0.2,
+    "text": "Henrik Rønning 71407358"
+   }
+  }
+ },
+ {
+  "id": "R005",
+  "dist": "near",
+  "background": "clean",
+  "truth": "90202659",
+  "name": "Vilde Sæther",
+  "shipped": "correct",
+  "capPxAt1280": 36.7,
+  "roi": [
+   728,
+   1953,
+   2054,
+   3112
+  ],
+  "wordH": 151.20000000000027,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "90202659"
+    ],
+    "ms": 59,
+    "w": 265,
+    "h": 232,
+    "scale": 0.2,
+    "text": "Vilde sæther 90202659"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "90202659"
+    ],
+    "ms": 59,
+    "w": 265,
+    "h": 232,
+    "scale": 0.2,
+    "text": "Vilde sæther 90202659"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "90202659"
+    ],
+    "ms": 68,
+    "w": 265,
+    "h": 232,
+    "scale": 0.2,
+    "text": "Vilde sæther 90202659"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "90202659"
+    ],
+    "ms": 60,
+    "w": 265,
+    "h": 232,
+    "scale": 0.2,
+    "text": "Vilde sæther 90202659"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "90202659"
+    ],
+    "ms": 63,
+    "w": 265,
+    "h": 232,
+    "scale": 0.2,
+    "text": "Vilde sæther 90202659"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "90202659"
+    ],
+    "ms": 64,
+    "w": 265,
+    "h": 232,
+    "scale": 0.2,
+    "text": "Vilde sæther 90202659"
+   }
+  }
+ },
+ {
+  "id": "R009",
+  "dist": "near",
+  "background": "clean",
+  "truth": "28445512",
+  "name": "Jakob/Frida Toftøy",
+  "shipped": "correct",
+  "capPxAt1280": 35,
+  "roi": [
+   488,
+   1821,
+   1881,
+   2904
+  ],
+  "wordH": 141.75,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "28445512"
+    ],
+    "ms": 73,
+    "w": 279,
+    "h": 217,
+    "scale": 0.2,
+    "text": "Jakob/Frida Toftøy 28445512"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "28445512"
+    ],
+    "ms": 74,
+    "w": 279,
+    "h": 217,
+    "scale": 0.2,
+    "text": "Jakob/Frida Toftøy 28445512"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "28445512"
+    ],
+    "ms": 74,
+    "w": 279,
+    "h": 217,
+    "scale": 0.2,
+    "text": "Jakob/Frida Toftøy 28445512"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "28445512"
+    ],
+    "ms": 79,
+    "w": 295,
+    "h": 229,
+    "scale": 0.21,
+    "text": "Jakob/Frida Toftøy 28445512"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "28445512"
+    ],
+    "ms": 77,
+    "w": 279,
+    "h": 217,
+    "scale": 0.2,
+    "text": "Jakob/Frida Toftøy 28445512"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "28445512"
+    ],
+    "ms": 78,
+    "w": 279,
+    "h": 217,
+    "scale": 0.2,
+    "text": "Jakob/Frida Toftøy 28445512"
+   }
+  }
+ },
+ {
+  "id": "R013",
+  "dist": "near",
+  "background": "clean",
+  "truth": "37301097",
+  "name": "Marte/Håkon Rønning",
+  "shipped": "correct",
+  "capPxAt1280": 37.8,
+  "roi": [
+   487,
+   1395,
+   2099,
+   2526
+  ],
+  "wordH": 144.9000000000001,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "37301097"
+    ],
+    "ms": 84,
+    "w": 322,
+    "h": 226,
+    "scale": 0.2,
+    "text": "Marte/Håkon Rønning 37301097"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "37301097"
+    ],
+    "ms": 83,
+    "w": 322,
+    "h": 226,
+    "scale": 0.2,
+    "text": "Marte/Håkon Rønning 37301097"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "37301097"
+    ],
+    "ms": 83,
+    "w": 322,
+    "h": 226,
+    "scale": 0.2,
+    "text": "Marte/Håkon Rønning 37301097"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "37301097"
+    ],
+    "ms": 87,
+    "w": 334,
+    "h": 234,
+    "scale": 0.21,
+    "text": "Marte/Håkon Rønning 37301097"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "37301097"
+    ],
+    "ms": 90,
+    "w": 322,
+    "h": 226,
+    "scale": 0.2,
+    "text": "Marte/Håkon Rønning 37301097"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "37301097"
+    ],
+    "ms": 89,
+    "w": 322,
+    "h": 226,
+    "scale": 0.2,
+    "text": "Marte/Håkon Rønning 37301097"
+   }
+  }
+ },
+ {
+  "id": "R017",
+  "dist": "near",
+  "background": "clean",
+  "truth": "67466075",
+  "name": "Ida Myhre",
+  "shipped": "correct",
+  "capPxAt1280": 33.9,
+  "roi": [
+   1106,
+   1871,
+   2312,
+   2904
+  ],
+  "wordH": 135.44999999999982,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "67466075"
+    ],
+    "ms": 54,
+    "w": 241,
+    "h": 207,
+    "scale": 0.2,
+    "text": "Ida Myhre 67466075"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "67466075"
+    ],
+    "ms": 55,
+    "w": 241,
+    "h": 207,
+    "scale": 0.2,
+    "text": "Ida Myhre 67466075"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "67466075"
+    ],
+    "ms": 55,
+    "w": 241,
+    "h": 207,
+    "scale": 0.2,
+    "text": "Ida Myhre 67466075"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "67466075"
+    ],
+    "ms": 56,
+    "w": 267,
+    "h": 229,
+    "scale": 0.22,
+    "text": "Ida Myhre 67466075"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "67466075"
+    ],
+    "ms": 180,
+    "w": 241,
+    "h": 207,
+    "scale": 0.2,
+    "text": "mm Ida Myhre 67466075 7 poem te"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "67466075"
+    ],
+    "ms": 181,
+    "w": 241,
+    "h": 207,
+    "scale": 0.2,
+    "text": "mm Ida Myhre 67466075 7 poem te"
+   }
+  }
+ },
+ {
+  "id": "R002",
+  "dist": "mid",
+  "background": "clean",
+  "truth": "73752576",
+  "name": "Lars Berg-Hansen",
+  "shipped": "correct",
+  "capPxAt1280": 21.9,
+  "roi": [
+   1332,
+   1962,
+   2344,
+   2652
+  ],
+  "wordH": 94.5,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "73752576"
+    ],
+    "ms": 63,
+    "w": 202,
+    "h": 138,
+    "scale": 0.2,
+    "text": "Lars Berg-Hansen 73752576"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "73752576"
+    ],
+    "ms": 67,
+    "w": 214,
+    "h": 146,
+    "scale": 0.21,
+    "text": "Lars Berg-Hansen 73752576"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "73752576"
+    ],
+    "ms": 68,
+    "w": 257,
+    "h": 175,
+    "scale": 0.25,
+    "text": "Lars Berg-Hansen 73752576"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "73752576"
+    ],
+    "ms": 70,
+    "w": 321,
+    "h": 219,
+    "scale": 0.32,
+    "text": "Lars Berg-Hansen 73752576"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "73752576"
+    ],
+    "ms": 66,
+    "w": 214,
+    "h": 146,
+    "scale": 0.21,
+    "text": "Lars Berg-Hansen 73752576"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "73752576"
+    ],
+    "ms": 72,
+    "w": 257,
+    "h": 175,
+    "scale": 0.25,
+    "text": "Lars Berg-Hansen 73752576"
+   }
+  }
+ },
+ {
+  "id": "R006",
+  "dist": "mid",
+  "background": "fabric",
+  "truth": "56227045",
+  "name": "Iver Jakob Rønning",
+  "shipped": "correct",
+  "capPxAt1280": 22.9,
+  "roi": [
+   942,
+   1909,
+   1821,
+   2725
+  ],
+  "wordH": 97.65000000000009,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "56227045"
+    ],
+    "ms": 58,
+    "w": 176,
+    "h": 163,
+    "scale": 0.2,
+    "text": "Iver Jakob Rønning 56227045"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "56227045"
+    ],
+    "ms": 116,
+    "w": 180,
+    "h": 167,
+    "scale": 0.2,
+    "text": "Iver Jakob Rønning 56227045 Ryen"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "56227045"
+    ],
+    "ms": 159,
+    "w": 216,
+    "h": 201,
+    "scale": 0.25,
+    "text": "FL Iver Jakob Rønning 56227045 ANE"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "56227045"
+    ],
+    "ms": 178,
+    "w": 270,
+    "h": 251,
+    "scale": 0.31,
+    "text": "La Iver Jakob Rønnin 56227045 ARE"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "56227045"
+    ],
+    "ms": 118,
+    "w": 180,
+    "h": 167,
+    "scale": 0.2,
+    "text": "Iver Jakob Rønning 56227045 Assen"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "56227045"
+    ],
+    "ms": 164,
+    "w": 216,
+    "h": 201,
+    "scale": 0.25,
+    "text": "må Iver Jakob Rønning 56227045 AS"
+   }
+  }
+ },
+ {
+  "id": "R010",
+  "dist": "mid",
+  "background": "clean",
+  "truth": "94092672",
+  "name": "Tuva",
+  "shipped": "correct",
+  "capPxAt1280": 21.2,
+  "roi": [
+   1562,
+   964,
+   2372,
+   1534
+  ],
+  "wordH": 94.5,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "94092672"
+    ],
+    "ms": 36,
+    "w": 162,
+    "h": 114,
+    "scale": 0.2,
+    "text": "Tuva 94092672"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "94092672"
+    ],
+    "ms": 34,
+    "w": 171,
+    "h": 121,
+    "scale": 0.21,
+    "text": "Tuva 94092672"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "94092672"
+    ],
+    "ms": 39,
+    "w": 206,
+    "h": 145,
+    "scale": 0.25,
+    "text": "Tuva 94092672"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "94092672"
+    ],
+    "ms": 44,
+    "w": 257,
+    "h": 181,
+    "scale": 0.32,
+    "text": "Tuva 94092672"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "94092672"
+    ],
+    "ms": 35,
+    "w": 171,
+    "h": 121,
+    "scale": 0.21,
+    "text": "Tuva 94092672"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "94092672"
+    ],
+    "ms": 39,
+    "w": 206,
+    "h": 145,
+    "scale": 0.25,
+    "text": "Tuva 94092672"
+   }
+  }
+ },
+ {
+  "id": "R014",
+  "dist": "mid",
+  "background": "clean",
+  "truth": "81108103",
+  "name": "Even Østby",
+  "shipped": "correct",
+  "capPxAt1280": 22.4,
+  "roi": [
+   1515,
+   1317,
+   2315,
+   1988
+  ],
+  "wordH": 88.19999999999982,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "81108103"
+    ],
+    "ms": 55,
+    "w": 160,
+    "h": 134,
+    "scale": 0.2,
+    "text": "Even Østby 81108103"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "81108103"
+    ],
+    "ms": 56,
+    "w": 181,
+    "h": 152,
+    "scale": 0.23,
+    "text": "Even Østby 81108103"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "81108103"
+    ],
+    "ms": 56,
+    "w": 218,
+    "h": 183,
+    "scale": 0.27,
+    "text": "Even Østby 81108103"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "81108103"
+    ],
+    "ms": 63,
+    "w": 272,
+    "h": 228,
+    "scale": 0.34,
+    "text": "Even Østby 81108103"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "81108103"
+    ],
+    "ms": 56,
+    "w": 181,
+    "h": 152,
+    "scale": 0.23,
+    "text": "Even Østby 81108103"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "81108103"
+    ],
+    "ms": 60,
+    "w": 218,
+    "h": 183,
+    "scale": 0.27,
+    "text": "Even Østby 81108103"
+   }
+  }
+ },
+ {
+  "id": "R018",
+  "dist": "mid",
+  "background": "clean",
+  "truth": "96765425",
+  "name": "Vilde Toftøy",
+  "shipped": "correct",
+  "capPxAt1280": 21.2,
+  "roi": [
+   693,
+   1436,
+   1474,
+   2104
+  ],
+  "wordH": 88.20000000000005,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "96765425"
+    ],
+    "ms": 47,
+    "w": 156,
+    "h": 134,
+    "scale": 0.2,
+    "text": "Vilde Toftøy 96765425"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "96765425"
+    ],
+    "ms": 53,
+    "w": 177,
+    "h": 151,
+    "scale": 0.23,
+    "text": "Vilde Toftøy 96765425"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "96765425"
+    ],
+    "ms": 56,
+    "w": 213,
+    "h": 182,
+    "scale": 0.27,
+    "text": "vilde Toftøy 96765425"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "96765425"
+    ],
+    "ms": 62,
+    "w": 266,
+    "h": 227,
+    "scale": 0.34,
+    "text": "Vilde Toftøy 96765425"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "96765425"
+    ],
+    "ms": 105,
+    "w": 177,
+    "h": 151,
+    "scale": 0.23,
+    "text": "LIE Vilde Toftøy 96765425"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "96765425"
+    ],
+    "ms": 60,
+    "w": 213,
+    "h": 182,
+    "scale": 0.27,
+    "text": "vilde Toftøy 96765425"
+   }
+  }
+ },
+ {
+  "id": "R003",
+  "dist": "far",
+  "background": "clean",
+  "truth": "92141931",
+  "name": "Nils/Ola Bjørkhaug",
+  "shipped": "correct",
+  "capPxAt1280": 13.3,
+  "roi": [
+   1796,
+   1219,
+   2281,
+   1629
+  ],
+  "wordH": 53.549999999999955,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "92141931"
+    ],
+    "ms": 57,
+    "w": 145,
+    "h": 123,
+    "scale": 0.3,
+    "text": "Nils/Ola Bjørkhaug 92141931"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "92141931"
+    ],
+    "ms": 64,
+    "w": 181,
+    "h": 153,
+    "scale": 0.37,
+    "text": "Nils/Ola Bjørkhaug 92141931"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "92141931"
+    ],
+    "ms": 72,
+    "w": 217,
+    "h": 184,
+    "scale": 0.45,
+    "text": "Nils/Ola Bjørkhaug 92141931"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "92141931"
+    ],
+    "ms": 80,
+    "w": 272,
+    "h": 230,
+    "scale": 0.56,
+    "text": "Nils/Ola Bjørkhaug 92141931"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "92141931"
+    ],
+    "ms": 69,
+    "w": 181,
+    "h": 153,
+    "scale": 0.37,
+    "text": "Nils/Ola Bjørkhaug 92141931"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "92141931"
+    ],
+    "ms": 72,
+    "w": 217,
+    "h": 184,
+    "scale": 0.45,
+    "text": "Nils/Ola Bjørkhaug 92141931"
+   }
+  }
+ },
+ {
+  "id": "R007",
+  "dist": "far",
+  "background": "clean",
+  "truth": "69945770",
+  "name": "Iver Berg",
+  "shipped": "correct",
+  "capPxAt1280": 14.1,
+  "roi": [
+   989,
+   2444,
+   1493,
+   2863
+  ],
+  "wordH": 53.54999999999973,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "69945770"
+    ],
+    "ms": 42,
+    "w": 151,
+    "h": 125,
+    "scale": 0.3,
+    "text": "Iver Berg 69945770"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "69945770"
+    ],
+    "ms": 47,
+    "w": 188,
+    "h": 156,
+    "scale": 0.37,
+    "text": "Iver Berg 69945770"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "69945770"
+    ],
+    "ms": 49,
+    "w": 226,
+    "h": 188,
+    "scale": 0.45,
+    "text": "Iver Berg 69945770"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "69945770"
+    ],
+    "ms": 58,
+    "w": 282,
+    "h": 235,
+    "scale": 0.56,
+    "text": "Iver Berg 69945770"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "69945770"
+    ],
+    "ms": 51,
+    "w": 188,
+    "h": 156,
+    "scale": 0.37,
+    "text": "Iver Berg 69945770"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "69945770"
+    ],
+    "ms": 57,
+    "w": 226,
+    "h": 188,
+    "scale": 0.45,
+    "text": "Iver Berg 69945770"
+   }
+  }
+ },
+ {
+  "id": "R011",
+  "dist": "far",
+  "background": "clean",
+  "truth": "22903894",
+  "name": "Erik/Lars Berg-Hansen",
+  "shipped": "correct",
+  "capPxAt1280": 13.4,
+  "roi": [
+   1636,
+   1707,
+   2225,
+   2145
+  ],
+  "wordH": 59.84999999999991,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "22903894"
+    ],
+    "ms": 57,
+    "w": 157,
+    "h": 117,
+    "scale": 0.27,
+    "text": "Erik/Lars Berg-Hansen 22903894"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "22903894"
+    ],
+    "ms": 74,
+    "w": 197,
+    "h": 146,
+    "scale": 0.33,
+    "text": "Erik/Lars Berg-Hansen 22903894"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "22903894"
+    ],
+    "ms": 76,
+    "w": 236,
+    "h": 176,
+    "scale": 0.4,
+    "text": "Erik/Lars Berg-Hansen 22903894"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "22903894"
+    ],
+    "ms": 88,
+    "w": 295,
+    "h": 220,
+    "scale": 0.5,
+    "text": "Erik/Lars Berg-Hansen 22903894"
+   },
+   "20:plain": {
+    "hit": false,
+    "cands": [],
+    "ms": 56,
+    "w": 197,
+    "h": 146,
+    "scale": 0.33,
+    "text": "Erik/Lars Berg-Hansen"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "22903894"
+    ],
+    "ms": 77,
+    "w": 236,
+    "h": 176,
+    "scale": 0.4,
+    "text": "Erik/Lars Berg-Hansen 22903894"
+   }
+  }
+ },
+ {
+  "id": "R015",
+  "dist": "far",
+  "background": "clean",
+  "truth": "60683907",
+  "name": "Jakob/Ingrid Haugen",
+  "shipped": "correct",
+  "capPxAt1280": 14.2,
+  "roi": [
+   1356,
+   1462,
+   1961,
+   1887
+  ],
+  "wordH": 56.700000000000045,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "60683907"
+    ],
+    "ms": 63,
+    "w": 171,
+    "h": 120,
+    "scale": 0.28,
+    "text": "Jakob/Ingrid Haugen 60683907"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "60683907"
+    ],
+    "ms": 74,
+    "w": 213,
+    "h": 150,
+    "scale": 0.35,
+    "text": "Jakob/Ingrid Haugen 60683907"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "60683907"
+    ],
+    "ms": 78,
+    "w": 256,
+    "h": 180,
+    "scale": 0.42,
+    "text": "Jakob/Ingrid Haugen 60683907"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "60683907"
+    ],
+    "ms": 84,
+    "w": 320,
+    "h": 225,
+    "scale": 0.53,
+    "text": "Jakob/lIngrid Haugen 60683907"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "60683907"
+    ],
+    "ms": 73,
+    "w": 213,
+    "h": 150,
+    "scale": 0.35,
+    "text": "Jakob/Ingrid Haugen 60683907"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "60683907"
+    ],
+    "ms": 94,
+    "w": 256,
+    "h": 180,
+    "scale": 0.42,
+    "text": "Jakob/Ingrid Haugen 60683907"
+   }
+  }
+ },
+ {
+  "id": "R019",
+  "dist": "far",
+  "background": "clean",
+  "truth": "94293940",
+  "name": "Henrik/Sofie Nordmann",
+  "shipped": "correct",
+  "capPxAt1280": 14.5,
+  "roi": [
+   1200,
+   1862,
+   1827,
+   2268
+  ],
+  "wordH": 50.40000000000009,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "94293940"
+    ],
+    "ms": 71,
+    "w": 199,
+    "h": 129,
+    "scale": 0.32,
+    "text": "Henrik/Sofie Nordmann 94293940"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "94293940"
+    ],
+    "ms": 79,
+    "w": 249,
+    "h": 161,
+    "scale": 0.4,
+    "text": "Henrik/Sofie Nordmann 94293940"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "94293940"
+    ],
+    "ms": 88,
+    "w": 299,
+    "h": 193,
+    "scale": 0.48,
+    "text": "Henrik/Sofie Nordmann 94293940"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "94293940"
+    ],
+    "ms": 94,
+    "w": 373,
+    "h": 242,
+    "scale": 0.6,
+    "text": "Henrik/Sofie Nordmann 94293940"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "94293940"
+    ],
+    "ms": 82,
+    "w": 249,
+    "h": 161,
+    "scale": 0.4,
+    "text": "Henrik/Sofie Nordmann 94293940"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "94293940"
+    ],
+    "ms": 102,
+    "w": 299,
+    "h": 193,
+    "scale": 0.48,
+    "text": "Henrik/Sofie Nordmann 94293940"
+   }
+  }
+ },
+ {
+  "id": "R004",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "57769584",
+  "name": "Ida/Kari Haugen",
+  "shipped": "correct",
+  "capPxAt1280": 8.1,
+  "roi": [
+   2109,
+   1852,
+   2408,
+   2066
+  ],
+  "wordH": 25.200000000000045,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "57769584"
+    ],
+    "ms": 184,
+    "w": 190,
+    "h": 136,
+    "scale": 0.63,
+    "text": "å Ida/Kari Haugen 57769584 LE ARES VEE SST EE"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "57769584"
+    ],
+    "ms": 163,
+    "w": 237,
+    "h": 170,
+    "scale": 0.79,
+    "text": "elv OVE, Ida/Kari Haugen 57769584"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "57769584"
+    ],
+    "ms": 181,
+    "w": 285,
+    "h": 204,
+    "scale": 0.95,
+    "text": "Al NE, Ida/Kari Haugen 57769584 ØRE”"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "57769584"
+    ],
+    "ms": 110,
+    "w": 356,
+    "h": 255,
+    "scale": 1.19,
+    "text": "Ida/Kari Haugen 57769584 PRE å"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "57769584"
+    ],
+    "ms": 294,
+    "w": 237,
+    "h": 170,
+    "scale": 0.79,
+    "text": "elv NOVARA, Ida/Kari Haugen 57769584 å GT 5 TG pe"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "57769584"
+    ],
+    "ms": 310,
+    "w": 285,
+    "h": 204,
+    "scale": 0.95,
+    "text": "el NOE, Ida/Kari Haugen 57769584 å TE 4 GT GL ge"
+   }
+  }
+ },
+ {
+  "id": "R012",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "23247139",
+  "name": "Vilde Hauge",
+  "shipped": "correct",
+  "capPxAt1280": 8.7,
+  "roi": [
+   1953,
+   1084,
+   2255,
+   1339
+  ],
+  "wordH": 31.5,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "23247139"
+    ],
+    "ms": 53,
+    "w": 153,
+    "h": 130,
+    "scale": 0.51,
+    "text": "vilde Hauge 23247139"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "23247139"
+    ],
+    "ms": 59,
+    "w": 192,
+    "h": 162,
+    "scale": 0.63,
+    "text": "vilde Hauge 23247139"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "23247139"
+    ],
+    "ms": 59,
+    "w": 230,
+    "h": 194,
+    "scale": 0.76,
+    "text": "vilde Hauge 23247139"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "23247139"
+    ],
+    "ms": 67,
+    "w": 288,
+    "h": 243,
+    "scale": 0.95,
+    "text": "vilde Hauge 23247139"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "23247139"
+    ],
+    "ms": 186,
+    "w": 192,
+    "h": 162,
+    "scale": 0.63,
+    "text": "ee Vilde Hauge 23247139 se"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "23247139"
+    ],
+    "ms": 133,
+    "w": 230,
+    "h": 194,
+    "scale": 0.76,
+    "text": "LIE vilde Hauge 23247139"
+   }
+  }
+ },
+ {
+  "id": "R016",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "67148030",
+  "name": "Selma Marte Strand",
+  "shipped": "correct",
+  "capPxAt1280": 7.9,
+  "roi": [
+   1322,
+   1402,
+   1664,
+   1625
+  ],
+  "wordH": 28.34999999999991,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "67148030"
+    ],
+    "ms": 73,
+    "w": 193,
+    "h": 126,
+    "scale": 0.56,
+    "text": "Selma Marte Strand 67148030"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "67148030"
+    ],
+    "ms": 78,
+    "w": 241,
+    "h": 157,
+    "scale": 0.71,
+    "text": "Selma Marte Strand 67148030"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "67148030"
+    ],
+    "ms": 83,
+    "w": 290,
+    "h": 189,
+    "scale": 0.85,
+    "text": "Selma Marte Strand 67148030"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "67148030"
+    ],
+    "ms": 93,
+    "w": 362,
+    "h": 236,
+    "scale": 1.06,
+    "text": "Selma Marte Strand 67148030"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "67148030"
+    ],
+    "ms": 78,
+    "w": 241,
+    "h": 157,
+    "scale": 0.71,
+    "text": "Selma Marte Strand 67148030"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "67148030"
+    ],
+    "ms": 89,
+    "w": 290,
+    "h": 189,
+    "scale": 0.85,
+    "text": "Selma Marte Strand 67148030 -"
+   }
+  }
+ },
+ {
+  "id": "R020",
+  "dist": "vfar",
+  "background": "fabric",
+  "truth": "55674456",
+  "name": "Selma Nygård",
+  "shipped": "correct",
+  "capPxAt1280": 8,
+  "roi": [
+   649,
+   1550,
+   970,
+   1821
+  ],
+  "wordH": 37.799999999999955,
+  "by": {
+   "16": {
+    "hit": true,
+    "cands": [
+     "55674456"
+    ],
+    "ms": 48,
+    "w": 136,
+    "h": 115,
+    "scale": 0.42,
+    "text": "Selma Nygård 55674456"
+   },
+   "20": {
+    "hit": true,
+    "cands": [
+     "55674456"
+    ],
+    "ms": 55,
+    "w": 170,
+    "h": 143,
+    "scale": 0.53,
+    "text": "Selma Nygård 55674456"
+   },
+   "24": {
+    "hit": true,
+    "cands": [
+     "55674456"
+    ],
+    "ms": 60,
+    "w": 204,
+    "h": 172,
+    "scale": 0.63,
+    "text": "Selma Nygård 55674456"
+   },
+   "30": {
+    "hit": true,
+    "cands": [
+     "55674456"
+    ],
+    "ms": 64,
+    "w": 255,
+    "h": 215,
+    "scale": 0.79,
+    "text": "Selma Nygård 55674456"
+   },
+   "20:plain": {
+    "hit": true,
+    "cands": [
+     "55674456"
+    ],
+    "ms": 56,
+    "w": 170,
+    "h": 143,
+    "scale": 0.53,
+    "text": "Selma Nygård 55674456"
+   },
+   "24:plain": {
+    "hit": true,
+    "cands": [
+     "55674456"
+    ],
+    "ms": 61,
+    "w": 204,
+    "h": 172,
+    "scale": 0.63,
+    "text": "Selma Nygård 55674456"
+   }
+  }
+ },
+ {
+  "id": "R081",
+  "dist": "vfar",
+  "background": "clean",
+  "truth": "27000773",
+  "name": "Emil Moen",
+  "shipped": "correct",
+  "capPxAt1280": 8.3,
+  "roi": null,
+  "wordH": null,
+  "by": {}
+ }
+]

@@ -1997,3 +1997,364 @@ Residual risk, honestly:
   figure is a lower bound for a phone, and this session's machine was already
   49% slower than round 6's — the same code truncated 13 images here against 11
   there, before any change.
+
+---
+
+# Round 9 — cropping to the label, so the resolution distance needs becomes affordable (2026-09-19, implemented)
+
+**Numbering note.** Sections 50-60 are round 8's and live on that round's
+investigation branch; this branch is based on current `main` (`3f84c82`), where
+the report ends at section 49. The gap is deliberate rather than a lost section —
+round 8's text lands in front of this one when its branch merges. Everything
+below quotes round 8's numbers explicitly so this section stands on its own.
+
+## 61. What this round changes, and what it is built on
+
+Round 8 measured the pipeline's one remaining, properly-characterised weak point:
+**distance**. Once the digit row's cap height falls below ~12px at the primary
+pass's 1280px target, phone accuracy halves — 8/19 (42%) against 92-96% from 14px
+up. It is a cliff, not a slope. Perspective skew (32/33) and physical bending
+(24/24) it measured in isolation and found already handled; this round touches
+neither.
+
+Round 8 also measured the obvious fix and rejected it: a **global** 2000px pass
+recovers 6 of 17 failures but costs a p90 of 4961ms on textured frames, with one
+control at 2560px taking 24179ms — five times the whole budget. Its ranked
+recommendation, described but not implemented, was to **crop to the label first**,
+so a higher-resolution pass only has to resample a few hundred pixels instead of a
+whole frame, and so the background texture that causes both the latency tail and
+round 6's hallucinated garbage goes away with it.
+
+That is what this round implements, and what it measures.
+
+**The test set is round 8's own 128 images, reused unchanged**, which makes every
+before/after here a paired comparison on the same photograph rather than two
+samples of a distribution. Before using them I checked they are what round 8
+reported: the distribution matches exactly (near 26 / mid 39 / far 44 / vfar 19,
+and cap-height slices of 26 / 39 / 44 / 19), and re-running `compose8.mjs 0 4`
+reproduces the clean-background frames **byte for byte**. One reproducibility
+caveat worth recording: **fabric backgrounds are not byte-reproducible**, because
+`compose8.mjs` builds them from `sharp`'s gaussian `noise`, which is unseeded — a
+regenerated fabric frame carries the same texture statistics but a different draw.
+30 of the 128 images are fabric. Using round 8's actual files sidesteps this
+entirely; anyone regenerating from scratch should expect the fabric images to
+differ in detail.
+
+Scripts and both raw runs are committed under `.superpowers/ocr9/`.
+
+## 62. The chicken-and-egg problem: can a pass that failed still say where to crop?
+
+Cropping needs to know where the label is, and at the point the pipeline knows it
+is in trouble it has by definition just failed to read the label. The idea worth
+testing first was that Tesseract's word-level bounding boxes survive a bad read —
+that a pass too poor to be *accepted* may still have *located* text.
+
+`roidump.mjs` runs the two shipped primary passes (1280px, plain and boosted,
+PSM 11, `nor`) over round 8's 17 failures and 20 of its controls, and dumps every
+word box with its confidence. It does not assume; it looks.
+
+**It holds, and cleanly, on clean backgrounds.** R008 — a vfar label the shipped
+pipeline reported as empty:
+
+```
+plain  960x1280  428ms  words=0
+boost  960x1280  213ms  words=3
+   "Jonas"     c=71  [577,676,613,684]
+   "Nordmann"  c=95  [563,690,628,699]
+   "60728412"  c=79  [568,703,624,714]
+```
+
+Three boxes, stacked, 8-11px tall, sitting exactly on the label. R116 is the
+sharper demonstration, because the characters it read are *wrong* and the location
+is still right:
+
+```
+   "Jonas"    c=81  [324,502,351,510]
+   "Toftøy"   c=55  [323,513,352,523]
+   "254885g"  c=10  [316,525,359,535]     truth: 25488518
+```
+
+So the failed pass knows where the label is even when it does not know what it
+says. That is the whole mechanism.
+
+**On fabric it does not hold, and that turns out not to matter.** The fabric
+frames produce 69-236 "words" of weave speckle spread over the frame — a union of
+all boxes would be the whole photo. Filtering at the bar `scoreRecognition`
+already uses (confidence >= 60, three characters or more) removes the speckle, but
+on those images it removes everything: no ROI is derivable at all.
+
+| | n | ROI derived | no ROI |
+| --- | --- | --- | --- |
+| round 8's failures, clean background | 10 | **10** | 0 |
+| round 8's failures, fabric background | 7 | 0 | **7** |
+| round 8's controls | 20 | 19 | 1 |
+
+The seven are `R075 R076 R084 R086 R111 R119 R122`. Round 8's own resolution sweep
+found **eight images unreadable at every `maxDim` it tried**, and seven of them
+are exactly these. They are its "geometry plus texture" residual, not its pixel
+problem. Declining to crop them costs nothing that was ever available.
+
+The one control with no ROI is R081 (vfar, clean) where the primary passes produce
+no words whatsoever — the shipped ladder reads it correctly later anyway, and the
+crop stage simply does not run. That is the honest answer to "what if the fast
+path found literally nothing": **there are such cases, the mechanism has nothing
+to say about them, and it stays out of the way.**
+
+## 63. What the crop actually reads, and how much to upscale it
+
+`croplab.mjs` crops to the derived ROI and recognises it at a range of target text
+heights, over the same 29 images an ROI exists for. The target is expressed as the
+height a label line should end up at in the crop — which for a near-distance label
+is a *downscale*, and for a distant one an upscale of at most a few times.
+
+```
+                                   target 20px  30px   45px   60px
+FAILURES with an ROI (n=10)  true number  8      6      6      6
+                             wrong        1      1      0      1
+CONTROLS with an ROI (n=19)  true number 19     19     19     18
+one pass, all 29 cases  median          54ms   59ms   77ms  107ms
+                        max            175ms  224ms  265ms  437ms
+```
+
+Two things to read off this. First, **it works**: a single cropped pass reads the
+true number on 8 of the 10 failures a full-frame pass could not, and does not
+disturb a single control. Second, **it is cheap** — 54-107ms median against round
+8's full-frame sweep at 2000px (301ms median, 4961ms p90, 6292ms max), because the
+input is a few hundred pixels across and carries no background.
+
+The remaining question was the wrong-number risk, which this project has
+consistently treated as worse than an empty field. A single pass at the best
+target emits one (R108: `41654625` for a true `47654625`). Requiring two passes to
+**agree** removes it, and the pair that scores best is one boosted and one plain at
+slightly different scales — the same plain/boosted pairing the primary passes
+already use:
+
+| strategy | failures (n=10) | controls (n=19) | cost |
+| --- | --- | --- | --- |
+| one boosted pass @20px | 8 correct, **1 wrong** | 19 correct | ~55ms |
+| three passes, mode vote | 7 correct, 0 wrong | 19 correct | ~250ms |
+| **boosted @20px + plain @24px, must agree** | **7 correct, 0 wrong** | **19 correct** | **~162ms** |
+
+R108 is where the rule earns its place: the two passes read `41654625` and
+`41765462` — two different wrong numbers — and the stage correctly reports
+nothing. One correct answer traded for one wrong one is the trade rounds 5 and 7
+already made deliberately.
+
+## 64. The trigger, and the case that needed a second one
+
+The digit vote's trigger was not copied, because it answers a different question:
+it fires when two primary passes *disagree about a number*, which is a
+wrong-number signal, while distance produces **empty fields** — in round 8's <12px
+bucket, 9 of 19 images had no number at all.
+
+The first condition is therefore the ordinary one: **nothing has been accepted
+yet**. The second comes from round 8's cliff directly — **the located text is below
+it**. Round 8 reports cap height; a word box also holds ascenders and descenders,
+so its height runs ~1.2-1.4x the cap, and 15px of box is about 11-12px of cap.
+Measured on round 8's images, that separates the buckets: vfar boxes are 8-12px at
+the primary scale, far are 16-19px.
+
+Trigger 2 matters because two of round 8's three wrong numbers sat in that bucket
+with a result the ladder had **accepted** (R116, R128), so trigger 1 alone would
+never have looked at them.
+
+The first 128-image run then showed the second condition missing R128 anyway, and
+the reason is worth recording rather than patching around:
+
+```
+R128  plain pass:   "Thea" c=35  [443,558,464,591]   33px tall
+                    "Henrik" c=91  [472,570,509,587]  17px
+                    "31956304" c=67  [447,590,501,599]  9px     truth: 31986304
+```
+
+A severe pitch plus a saddle bend left the *name* row's box nearly twice the
+height of the digit row's, so the median box cleared the threshold while the
+digits were 9px. Both primary passes agreed on the wrong number, so nothing else
+in the pipeline looks at it either.
+
+The fix is a second view of the same cliff, and it is round 8's own closing
+recommendation stated physically: **how much of the frame the label fills** ("fine
+down to ~20%, falls apart around 12%"). Measured on the *text that was found*,
+before this file's padding — so the padding cannot decide whether a label counts as
+small (`spancheck.mjs`):
+
+| bucket | span of the located text, as a fraction of frame width |
+| --- | --- |
+| vfar | 2.6 - 7.8% |
+| **R128** (vfar, skewed boxes) | **6.5%** |
+| far | 9.0 - 12.2% |
+| mid | 14.2 - 19.7% |
+| near | 22.0 - 31.4% |
+
+8% sits in the gap. It is lower than round 8's 12% because this measures the text,
+not the sticker it is printed on. With it the stage fires on 28 of the 128 images
+(vfar 10, far 13, mid 3, near 2) rather than on everything.
+
+## 65. What was built
+
+In `gjenglemt/src/ocr.ts`, one new stage plus the pure functions it is made of —
+`deriveLabelRoi`, `shouldCropToRoi`, `cropPassScale` and `wordRectInImage`, all
+exported and unit-tested against the dumps above (18 new tests; recognition itself
+stays the harness's job, as the file's existing comment says).
+
+- Every pass now reports **where** it saw text, mapped back to the original
+  photo's pixels (`wordRectInImage` undoes the pass's downscale and, for the
+  orientation probes, its quarter turn), so boxes from passes at different sizes
+  and angles pool into one pile of evidence.
+- The stage runs **after the orientation probes and before the refinement
+  ladder**. On the images it helps, that ladder is five full-frame passes and
+  ~1-2s of work ending in nothing, while two crop passes cost ~160ms; when the
+  crop answers, the ladder never runs.
+- When the two crop passes agree, that number becomes the answer **and the
+  full-frame digit vote is skipped**. This is not an optimisation, it is a
+  correction: on R008 the boosted primary pass read the number correctly, the
+  vote's five full-frame passes at 1280px could not see an 8px digit row at all,
+  they disagreed, and the field was blanked. A vote that cannot read the label is
+  not evidence against a pass that can.
+- The stage is **additive**. If no ROI can be derived, or the crop passes do not
+  agree, nothing below it changes — a bad crop can only fail to help.
+
+`RESULT_DEADLINE_MS` is untouched, and the crop passes go through the same
+`attempt`/`signal` machinery as every other pass, so `main.ts`'s deadline cuts
+them exactly as it cuts the rest.
+
+## 66. Results: 128 images, and why the baseline was re-run
+
+Round 8's stored numbers are not a fair yardstick here, for the reason round 7
+already documented: this session's machine is **slower**. Re-running the unchanged
+`main` build over the same 128 images in this session gives a p90 of 5468ms where
+round 8 recorded 4425ms, and 17 images over 5s where round 8 had 10 — *before any
+change*. So the headline below is against that same-session baseline, with round
+8's stored run alongside for continuity.
+
+```
+                       round 8 stored    same-session baseline    round 9
+phone correct           111/128 (87%)      110/128 (86%)        118/128 (92%)
+  WRONG                       3                  3                    1
+  missing                    14                 15                    9
+name exact               85/128 (66%)       84/128 (66%)         93/128 (73%)
+wall median                 909ms              960ms               1425ms
+wall p90                   4425ms             5468ms               5064ms
+wall max                   5517ms             5648ms               5637ms
+images over 5s               10                 17                   14
+deadline-truncated           10                 15                   13
+```
+
+**By the cap height that defines the cliff** (against the same-session baseline):
+
+| cap at the 1280px pass | n | phone before | phone after | wrong before → after | name before → after |
+| --- | --- | --- | --- | --- | --- |
+| >= 30px | 26 | 25 (96%) | 25 (96%) | 0 → 0 | 81% → 81% |
+| 20-30px | 39 | 36 (92%) | 37 (95%) | 1 → 1 | 77% → 79% |
+| 12-20px | 44 | 41 (93%) | 42 (95%) | 0 → 0 | 68% → 73% |
+| **< 12px** | **19** | **8 (42%)** | **14 (74%)** | **2 → 0** | **16% → 47%** |
+
+**Eight images fixed, none broken.** Nothing that was correct became wrong or
+empty, on either baseline.
+
+```
+R008 vfar clean  empty    -> 60728412   crop=2  3061ms -> 1457ms
+R024 vfar clean  empty    -> 28908715   crop=2  2990ms -> 1455ms
+R067 far  fabric empty    -> 29873918   crop=2  5506ms -> 3950ms   (was deadline-truncated)
+R091 vfar clean  empty    -> 21948503   crop=2  3572ms -> 1483ms
+R093 mid  clean  empty    -> 31633942   crop=2  3572ms -> 1523ms
+R096 vfar clean  empty    -> 61715110   crop=2  4633ms -> 1459ms
+R116 vfar clean  WRONG    -> 25488518   crop=2  2495ms -> 1459ms
+R128 vfar clean  WRONG    -> 31986304   crop=2   933ms -> 1427ms
+```
+
+Two of the eight were **wrong numbers turned into right ones**, which is the
+failure class this pipeline cares most about; the set's wrong-number count falls
+from 3 to 1 (R088, a fabric image the crop stage never fires on).
+
+**The isolated groups round 8 built to test perspective and bend are untouched**,
+which is what should happen — this fix is aimed at neither:
+
+| round 8's slice | round 8 stored | baseline | round 9 |
+| --- | --- | --- | --- |
+| flat, head-on, near/mid/far (control) | 18/18 | 18/18 | 18/18 |
+| perspective only, any severity | 32/33 | 32/33 | **32/33** |
+| ...severe perspective | 9/9 | 9/9 | 9/9 |
+| bend only, any severity | 24/24 | 23/24 | **24/24** |
+| ...arc/saddle, curved baselines | 12/12 | 11/12 | 12/12 |
+| severe perspective AND severe bend | 7/12 | 7/12 | 8/12 |
+| distance only: vfar, flat, head-on | 4/6 | 4/6 | **6/6** |
+
+In group `B-persp` — 24 images, every severity and both axes — **not one telefon
+field changed value at all**. The single change in `C-bend` is R067, a fixed
+image. The one baseline row that differs from round 8's stored run (bend only,
+23/24) is R067 again: it was deadline-truncated in this session's slower baseline
+and correct in round 8's faster one, which is itself a reminder of how close some
+of these images run to the wall.
+
+**Latency**, paired image by image against the same-session baseline:
+
+```
+wall delta   median -6ms   p90 +85ms   max +513ms   min -3543ms
+images over 5s   17 -> 14      newly over 5s: NONE
+crop passes (55 of them)   median 131ms   p90 213ms   max 279ms
+```
+
+The stage pays for itself. It costs ~500ms on ten images that were already
+answering correctly in two passes (they are distant labels, so trigger 2 fires),
+and it *saves* far more on eighteen others by ending the run before the refinement
+ladder and the digit vote — R096 4633ms → 1459ms, R016 5526ms → 1983ms, R066
+4119ms → 1510ms. Of the 28 images it fired on, only 3 went on to run the digit
+vote at all.
+
+One number needs explaining rather than hiding: the **set median moves 960ms →
+1425ms** while the paired median delta is −6ms. Both are true. The baseline has 71
+of 128 images clustered under 1.1s; moving seven of them into the 1.4s band pushes
+the 64th sorted value across that cluster's edge. The paired delta is the honest
+measure of what the change costs a given photo; the set median is a knife-edge
+statistic on this set.
+
+Nothing crosses the 5s deadline that did not already: the count falls from 17 to
+14, and every image in the round-9 list was over 5s in the baseline too.
+
+## 67. Verification and residual risk
+
+```
+$ npx tsc --noEmit      # clean
+$ npx vitest run        # Test Files 5 passed, Tests 73 passed (was 55; 18 new)
+$ npm run build         # ✓ built
+$ node run9.mjs 0 128   # 128 images, real Chromium + real Tesseract.js WASM, changed build
+$ APP=<baseline> OUT=results9base.jsonl node run9.mjs 0 128    # same, src/ocr.ts from main
+```
+
+The ROI logic was built test-first: `deriveLabelRoi`, `shouldCropToRoi`,
+`cropPassScale` and `wordRectInImage` each had failing tests before they existed,
+with fixtures taken from the real dumps in `.superpowers/ocr9/roidump.json` so a
+later "simplification" has to argue with a measured image. `npm run smoke` still
+fails for the reason round 7 documented — a stale assertion about the capture
+screen's first button, unrelated to OCR and failing before this round.
+
+Residual risk, honestly:
+
+- **The crop stage cannot help a textured background.** All seven fabric failures
+  produce no ROI, and they stay failures. They are also the images round 8 found
+  unreadable at every resolution, so this is a limit of the evidence in the frame
+  rather than of the stage — but "distance is fixed" would be the wrong summary.
+  Distance *on a clean background* is fixed; distance on fabric is still mostly
+  the deadline and the texture.
+- **Ten images pay ~500ms for nothing.** They were already correct, and trigger 2
+  fires on them because they are genuinely distant. That is the price of catching
+  R116 and R128, which were wrong rather than empty. A cheaper trigger would need
+  a signal that distinguishes "small and correct" from "small and wrong", and this
+  round found none.
+- **The agreement rule is a measured zero, not a proven zero.** Two crop passes
+  agreeing on a *wrong* number would be emitted confidently. It did not happen on
+  any of the 29 images with an ROI, nor on any of the 28 the stage fired on in the
+  full run, but 0/28 is not the same as impossible.
+- **`CROP_TRIGGER_SPAN_FRACTION = 0.08` has ~1 percentage point of headroom**
+  against the nearest control (R003 at 9.0%). Crossing it is a latency cost, not a
+  correctness one — the crop reads `far` labels correctly 19/19 — but it is a
+  tighter margin than the word-height threshold's.
+- **The crop scale was tuned on 29 images.** Targets of 20px and 24px were picked
+  from a sweep over one test set; a wider set could move them.
+- **Still desktop Chromium, still synthetic photographs, still printed labels.**
+  Every latency figure is a lower bound for a phone. Handwriting remains out of
+  scope (round 6 is the reference), as does in-plane rotation past 5 degrees.
+- **The `severe perspective AND severe bend` cell is 8/12 now rather than 7/12**,
+  which is one image and should not be read as an improvement to that
+  interaction — R087, its clearest case, still fails after 17 passes.

@@ -100,6 +100,317 @@ interface Pass {
   rotation: number;
   /** Apply the contrast boost. See `CONTRAST_GAIN`. */
   boostContrast?: boolean;
+  /**
+   * Recognise only this region of the photo, resampled by `scale`, instead of the
+   * whole frame at `maxDim`. See the ROI crop stage below.
+   */
+  crop?: { rect: RoiRect; scale: number };
+}
+
+/**
+ * The ROI crop stage — round 9.
+ *
+ * Round 8 measured the pipeline's one remaining, genuinely-characterised weak
+ * point: distance. Once the digit row's cap height falls below ~12px at the
+ * primary pass's 1280px target, phone accuracy halves — 8/19 (42%) against 92-96%
+ * from 14px up. It is a cliff, not a slope, which is what a resolution limit
+ * looks like. The same round measured the obvious fix and rejected it: raising
+ * `maxDim` globally to 2000px recovers 6 of 17 failures but costs a p90 of 4961ms
+ * on textured frames (one control took 24179ms at 2560px), which does not fit the
+ * 5s budget in `main.ts`.
+ *
+ * Cropping first is what makes the extra resolution affordable, and it is
+ * measured, not assumed (section 61 of the investigation report):
+ *
+ *  - A primary pass that *failed* still says **where** the label is. On round 8's
+ *    clean-background failures the two primary passes produced 2-5 word boxes
+ *    sitting tightly on the label even when the digits they read were garbage
+ *    ("254885g", "msno"). An ROI was derivable for 10 of the 17 failures.
+ *  - The 7 failures with no derivable ROI are all fabric backgrounds, where the
+ *    frame holds 69-236 speckle "words" and none of them clear the confidence
+ *    bar. Those are also the images round 8 found unreadable at *every* `maxDim`
+ *    it swept — a geometry-plus-texture problem, not a pixel one — so declining
+ *    to crop them costs nothing that was available.
+ *  - Recognising the crop costs 87-473ms for both passes (median ~160ms) against
+ *    the 301ms median / 4961ms p90 of a full-frame 2000px pass, because the input
+ *    is a few hundred pixels across instead of 2000, and carries no background.
+ */
+export interface RoiRect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** A word Tesseract found, in ORIGINAL photo pixels. See `wordRectInImage`. */
+export interface RoiWord {
+  text: string;
+  confidence: number;
+  rect: RoiRect;
+}
+
+export interface LabelRoi {
+  /** Where to crop, in original photo pixels. */
+  rect: RoiRect;
+  /** Median height of the boxes it was built from — what the crop scales by. */
+  wordHeight: number;
+  /** How many word boxes agreed on the location. */
+  words: number;
+  /**
+   * Longest side of the text that was found, *before* padding — how big the label
+   * is in the frame, which is what the trigger reads. Measuring it on the padded
+   * crop instead would let this file's own padding decide whether a label counts
+   * as small.
+   */
+  span: number;
+}
+
+/** What `preprocess` did, so word boxes can be mapped back to the photo. */
+export interface PassGeometry {
+  canvasWidth: number;
+  canvasHeight: number;
+  scaledWidth: number;
+  scaledHeight: number;
+  scale: number;
+  rotation: number;
+}
+
+/**
+ * Word boxes that may take part in locating the label. Same bar as
+ * `scoreRecognition` uses to decide a pass found real text, for the same reason:
+ * on a fabric background it is what separates the label from the weave.
+ */
+const ROI_MIN_WORD_CONFIDENCE = MIN_WORD_CONFIDENCE;
+const ROI_MIN_WORD_LENGTH = MIN_WORD_LENGTH;
+
+/**
+ * Two boxes join the same cluster when the gap between them is within this many
+ * line heights. The label's three lines sit within about one line height of each
+ * other; anything the background contributes does not.
+ */
+const ROI_GAP_LINES = 2;
+
+/**
+ * How far the crop reaches beyond the boxes that were actually found — the larger
+ * of a fraction of the cluster and a couple of line heights.
+ *
+ * The line-height floor is the one that matters: at distance the *digit row* is
+ * the first line to fall under the confidence bar (R091 located "Kristiansen" and
+ * nothing else), and a percentage of that single box would crop the number away.
+ */
+const ROI_PAD_FRACTION = 0.35;
+const ROI_PAD_LINES = 2;
+
+/** One box is a place; two are a corroborated place. */
+const ROI_MIN_WORDS = 2;
+
+/**
+ * The cliff, in the units the trigger can actually observe.
+ *
+ * Round 8 reports *cap* height at the 1280px pass; a word box also holds
+ * ascenders and descenders, so its height runs ~1.2-1.4x the cap. 15px of box is
+ * therefore about 11-12px of cap — round 8's 42% bucket — and separates that
+ * bucket cleanly from `far` (16-19px of box) on the measured images.
+ */
+const CROP_TRIGGER_WORD_PX = 15;
+
+/**
+ * The same cliff seen from the other side: how much of the frame the label fills.
+ *
+ * Round 8's closing recommendation puts it physically — "the pipeline is fine
+ * down to a label filling ~20% of the frame and falls apart around 12%" — and
+ * that view catches a case the per-word one misses. On R128 a severe pitch plus a
+ * saddle bend left the name row's box twice the height of the digit row's, so the
+ * median box cleared `CROP_TRIGGER_WORD_PX` while the digits were 9px; both
+ * primary passes then agreed on a *wrong* number, which no other trigger in this
+ * file looks at.
+ *
+ * The fraction is lower than round 8's 12% because this measures the *text* that
+ * was found, not the sticker it sits on. Measured across round 8's images
+ * (`.superpowers/ocr9/spancheck.mjs`): vfar 2.6-7.8%, the skewed R128 6.5%,
+ * far 9.0-12.2%, mid 14-20%, near 22-31%. 8% sits in the gap.
+ */
+const CROP_TRIGGER_SPAN_FRACTION = 0.08;
+
+/**
+ * The crop passes: one boosted, one plain, at slightly different target text
+ * heights, and the number is only taken when they agree.
+ *
+ * Measured over the 29 round-8 images an ROI could be derived for, this pair read
+ * the true number on 7 of the 10 failures and **all 19** controls, with **no
+ * wrong number at all**. A single boosted pass at 20px scores one better (8/10)
+ * but emits a wrong number on R108 — where the two passes here read two
+ * *different* wrong numbers and the agreement rule correctly reports nothing,
+ * which is the trade every earlier round in this file has already made.
+ */
+const CROP_PASSES: { targetWordHeight: number; boostContrast: boolean }[] = [
+  { targetWordHeight: 20, boostContrast: true },
+  { targetWordHeight: 24, boostContrast: false },
+];
+
+/** Bounds on the crop's rendered size: the stage's whole value is being cheap. */
+const CROP_MAX_EDGE = 2200;
+const CROP_MIN_SCALE = 0.2;
+
+/**
+ * Map a word box from a pass's preprocessed canvas back to original photo pixels,
+ * undoing that pass's downscale and rotation, so boxes from passes at different
+ * sizes and orientations can be pooled.
+ */
+export function wordRectInImage(bbox: RoiRect, geometry: PassGeometry): RoiRect {
+  const radians = (-geometry.rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const centreX = geometry.canvasWidth / 2;
+  const centreY = geometry.canvasHeight / 2;
+  const corners: [number, number][] = [
+    [bbox.x0, bbox.y0],
+    [bbox.x1, bbox.y0],
+    [bbox.x1, bbox.y1],
+    [bbox.x0, bbox.y1],
+  ];
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const [px, py] of corners) {
+    const dx = px - centreX;
+    const dy = py - centreY;
+    const ix = (dx * cos - dy * sin + geometry.scaledWidth / 2) / geometry.scale;
+    const iy = (dx * sin + dy * cos + geometry.scaledHeight / 2) / geometry.scale;
+    x0 = Math.min(x0, ix);
+    y0 = Math.min(y0, iy);
+    x1 = Math.max(x1, ix);
+    y1 = Math.max(y1, iy);
+  }
+  return { x0, y0, x1, y1 };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[sorted.length >> 1];
+}
+
+/**
+ * Where the label is, from the word boxes the passes that already ran produced.
+ * Exported for unit testing; the shapes in `ocr.test.ts` are real dumps.
+ *
+ * Deliberately conservative: it would rather return nothing than a wrong region,
+ * because the crop pass is additive — failing to crop leaves the existing ladder
+ * exactly as it was, while cropping the wrong place would hide the label from it.
+ */
+export function deriveLabelRoi(
+  words: RoiWord[],
+  imageWidth: number,
+  imageHeight: number
+): LabelRoi | null {
+  const usable = words.filter(
+    (word) =>
+      word.confidence >= ROI_MIN_WORD_CONFIDENCE &&
+      word.text.trim().length >= ROI_MIN_WORD_LENGTH &&
+      /[\p{L}\d]/u.test(word.text)
+  );
+  if (usable.length < ROI_MIN_WORDS) return null;
+
+  const gap = ROI_GAP_LINES * median(usable.map((word) => word.rect.y1 - word.rect.y0));
+  const textLength = (word: RoiWord) => word.text.trim().length;
+
+  // Single-linkage growth from the most text-bearing seeds. Only a handful of
+  // seeds are tried: the cluster containing the most confident text wins, which
+  // on a noisy frame is the label rather than whichever speckle came first.
+  let best: { rect: RoiRect; members: RoiWord[]; score: number } | null = null;
+  const seeds = [...usable].sort((a, b) => textLength(b) - textLength(a)).slice(0, 5);
+  for (const seed of seeds) {
+    let rect: RoiRect = { ...seed.rect };
+    const members = [seed];
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const word of usable) {
+        if (members.includes(word)) continue;
+        const dx = Math.max(0, rect.x0 - word.rect.x1, word.rect.x0 - rect.x1);
+        const dy = Math.max(0, rect.y0 - word.rect.y1, word.rect.y0 - rect.y1);
+        if (dx > gap || dy > gap) continue;
+        rect = {
+          x0: Math.min(rect.x0, word.rect.x0),
+          y0: Math.min(rect.y0, word.rect.y0),
+          x1: Math.max(rect.x1, word.rect.x1),
+          y1: Math.max(rect.y1, word.rect.y1),
+        };
+        members.push(word);
+        grew = true;
+      }
+    }
+    const score = members.reduce((total, word) => total + textLength(word), 0);
+    if (!best || score > best.score) best = { rect, members, score };
+  }
+  if (!best || best.members.length < ROI_MIN_WORDS) return null;
+
+  const wordHeight = median(best.members.map((word) => word.rect.y1 - word.rect.y0));
+  const padX = Math.max((best.rect.x1 - best.rect.x0) * ROI_PAD_FRACTION, ROI_PAD_LINES * wordHeight);
+  const padY = Math.max((best.rect.y1 - best.rect.y0) * ROI_PAD_FRACTION, ROI_PAD_LINES * wordHeight);
+  return {
+    rect: {
+      x0: Math.max(0, Math.round(best.rect.x0 - padX)),
+      y0: Math.max(0, Math.round(best.rect.y0 - padY)),
+      x1: Math.min(imageWidth, Math.round(best.rect.x1 + padX)),
+      y1: Math.min(imageHeight, Math.round(best.rect.y1 + padY)),
+    },
+    wordHeight,
+    words: best.members.length,
+    span: Math.max(best.rect.x1 - best.rect.x0, best.rect.y1 - best.rect.y0),
+  };
+}
+
+/**
+ * Whether to spend the crop stage on this photo. Exported for unit testing.
+ *
+ * Two triggers, both from round 8's measurements and neither of them the digit
+ * vote's rule — that one keys on two primary passes disagreeing about a number,
+ * which is a *wrong-number* signal, while distance produces empty fields:
+ *
+ *  1. Nothing has been accepted yet. The ladder is already going to keep
+ *     spending passes, and a cropped one is the cheapest it has.
+ *  2. Something *was* accepted, but the label text the passes located is below
+ *     the resolution cliff. That bucket is 42% correct and it is where both of
+ *     round 8's wrong numbers in the distance sweep sat (R116, R128) — accepted
+ *     results, so trigger 1 alone would never have looked at them.
+ */
+export function shouldCropToRoi({
+  settled,
+  roi,
+  imageWidth,
+  imageHeight,
+}: {
+  settled: boolean;
+  roi: LabelRoi | null;
+  imageWidth: number;
+  imageHeight: number;
+}): boolean {
+  if (!roi) return false;
+  if (!settled) return true;
+  const imageMaxDim = Math.max(1, imageWidth, imageHeight);
+  const atPrimaryScale = roi.wordHeight * (DEFAULT_MAX_DIM / imageMaxDim);
+  if (atPrimaryScale < CROP_TRIGGER_WORD_PX) return true;
+  // Round 8 measures a label's size as a fraction of the frame's *width*, which
+  // on a portrait phone photo is its shorter side.
+  return roi.span / Math.max(1, Math.min(imageWidth, imageHeight)) < CROP_TRIGGER_SPAN_FRACTION;
+}
+
+/**
+ * How much to resample the crop by so its text lands near `targetWordHeight`.
+ * Exported for unit testing.
+ *
+ * Note this is as often a *downscale* as an upscale: a near-distance label is
+ * already 145px per line in the frame, and the measured sweet spot for these
+ * crops is well below that.
+ */
+export function cropPassScale(roi: LabelRoi, targetWordHeight: number): number {
+  const width = roi.rect.x1 - roi.rect.x0;
+  const height = roi.rect.y1 - roi.rect.y0;
+  const wanted = targetWordHeight / Math.max(1, roi.wordHeight);
+  const capped = Math.min(wanted, CROP_MAX_EDGE / Math.max(1, width, height));
+  return Math.max(CROP_MIN_SCALE, capped);
 }
 
 /**
@@ -180,7 +491,7 @@ const MIN_VOTES = 2;
  * See `.superpowers/ocr-investigation-report.md`.
  */
 export interface OcrPassReport {
-  stage: 'probe' | 'pass' | 'digit';
+  stage: 'probe' | 'pass' | 'digit' | 'crop';
   maxDim: number;
   rotation: number;
   ms: number;
@@ -393,13 +704,15 @@ function newCanvas(width: number, height: number): [HTMLCanvasElement, CanvasRen
  * what canvas filtering handles well.
  */
 function shrinkTowards(
-  image: HTMLImageElement,
+  image: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
   targetWidth: number,
   targetHeight: number
 ): CanvasImageSource {
   let source: CanvasImageSource = image;
-  let width = image.naturalWidth || image.width;
-  let height = image.naturalHeight || image.height;
+  let width = sourceWidth;
+  let height = sourceHeight;
   while (width > targetWidth * 2 && height > targetHeight * 2) {
     width = Math.max(targetWidth, Math.round(width / 2));
     height = Math.max(targetHeight, Math.round(height / 2));
@@ -410,14 +723,47 @@ function shrinkTowards(
   return source;
 }
 
-/** Downscale to `pass.maxDim`, apply `pass.rotation`, grayscale, then boost contrast. */
-function preprocess(image: HTMLImageElement, pass: Pass): HTMLCanvasElement {
-  const sourceWidth = image.naturalWidth || image.width;
-  const sourceHeight = image.naturalHeight || image.height;
-  const scale = Math.min(MAX_UPSCALE, pass.maxDim / Math.max(sourceWidth, sourceHeight));
+/**
+ * Downscale to `pass.maxDim` — or crop to `pass.crop` and resample by its scale —
+ * then apply `pass.rotation`, grayscale, and the contrast boost.
+ */
+function preprocess(image: HTMLImageElement, pass: Pass): {
+  canvas: HTMLCanvasElement;
+  geometry: PassGeometry;
+} {
+  const imageWidth = image.naturalWidth || image.width;
+  const imageHeight = image.naturalHeight || image.height;
+
+  // A cropped pass starts from the region rather than the frame. Copying the
+  // region out at 1:1 first keeps the rest of this function — the halving
+  // downscale, the rotation, the grayscale — working on it unchanged.
+  let source: CanvasImageSource = image;
+  let sourceWidth = imageWidth;
+  let sourceHeight = imageHeight;
+  if (pass.crop) {
+    sourceWidth = Math.max(1, Math.round(pass.crop.rect.x1 - pass.crop.rect.x0));
+    sourceHeight = Math.max(1, Math.round(pass.crop.rect.y1 - pass.crop.rect.y0));
+    const [cropCanvas, cropContext] = newCanvas(sourceWidth, sourceHeight);
+    cropContext.drawImage(
+      image,
+      pass.crop.rect.x0,
+      pass.crop.rect.y0,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      sourceWidth,
+      sourceHeight
+    );
+    source = cropCanvas;
+  }
+
+  const scale = pass.crop
+    ? pass.crop.scale
+    : Math.min(MAX_UPSCALE, pass.maxDim / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
-  const shrunk = shrinkTowards(image, width, height);
+  const shrunk = shrinkTowards(source, sourceWidth, sourceHeight, width, height);
 
   const radians = (pass.rotation * Math.PI) / 180;
   const cos = Math.abs(Math.cos(radians));
@@ -451,13 +797,25 @@ function preprocess(image: HTMLImageElement, pass: Pass): HTMLCanvasElement {
   }
   context.putImageData(pixels, 0, 0);
 
-  return canvas;
+  return {
+    canvas,
+    geometry: {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      scaledWidth: width,
+      scaledHeight: height,
+      scale,
+      rotation: pass.rotation,
+    },
+  };
 }
 
 interface Recognition {
   text: string;
   score: number;
   confidence: number;
+  /** Where this pass saw text, in original photo pixels. See `deriveLabelRoi`. */
+  words: RoiWord[];
 }
 
 /**
@@ -499,13 +857,51 @@ function scoreRecognition(data: Tesseract.Page): number {
     .reduce((total, token) => total + token.length, 0);
 }
 
+/**
+ * Every word box the pass produced, mapped back to the photo's own pixels.
+ *
+ * This is the part that makes the crop stage possible at all: a pass whose text
+ * was too poor to *accept* still reports where it found text, and on round 8's
+ * distant labels those boxes sit on the label even when the characters inside
+ * them are wrong.
+ */
+function locatedWords(data: Tesseract.Page, geometry: PassGeometry): RoiWord[] {
+  const words: RoiWord[] = [];
+  for (const block of data.blocks ?? []) {
+    for (const paragraph of block.paragraphs ?? []) {
+      for (const line of paragraph.lines ?? []) {
+        for (const word of line.words ?? []) {
+          if (!word.bbox) continue;
+          words.push({
+            text: word.text ?? '',
+            confidence: word.confidence,
+            rect: wordRectInImage(
+              { x0: word.bbox.x0, y0: word.bbox.y0, x1: word.bbox.x1, y1: word.bbox.y1 },
+              geometry
+            ),
+          });
+        }
+      }
+    }
+  }
+  return words;
+}
+
 async function recognize(
   worker: Worker,
   image: HTMLImageElement,
   pass: Pass
 ): Promise<Recognition> {
-  const { data } = await worker.recognize(preprocess(image, pass), {}, { text: true, blocks: true });
-  return { text: data.text, score: scoreRecognition(data), confidence: data.confidence };
+  const { canvas, geometry } = preprocess(image, pass);
+  const { data } = await worker.recognize(canvas, {}, { text: true, blocks: true });
+  return {
+    text: data.text,
+    score: scoreRecognition(data),
+    confidence: data.confidence,
+    // A crop pass's boxes are in the crop's own frame, and the label has already
+    // been located by the time one runs, so they are not worth mapping back.
+    words: pass.crop ? [] : locatedWords(data, geometry),
+  };
 }
 
 export async function runOcr(
@@ -519,13 +915,18 @@ export async function runOcr(
   // much text the unaccepted one found, because only an accepted pass actually
   // produced what the caller is looking for.
   let bestAccepted: Recognition | null = null;
-  let bestAny: Recognition = { text: '', score: -1, confidence: 0 };
+  let bestAny: Recognition = { text: '', score: -1, confidence: 0, words: [] };
   let recognised = false;
   let settled = false;
   let lastError: unknown = null;
+  /** Every word box every full-frame pass produced, in photo pixels. */
+  const seenWords: RoiWord[] = [];
 
   /** Runs one recognition. Returns what it read, or null if it threw. */
-  const attempt = async (pass: Pass, stage: 'probe' | 'pass'): Promise<Recognition | null> => {
+  const attempt = async (
+    pass: Pass,
+    stage: 'probe' | 'pass' | 'crop'
+  ): Promise<Recognition | null> => {
     const startedAt = Date.now();
     let result: Recognition;
     try {
@@ -537,6 +938,7 @@ export async function runOcr(
       return null;
     }
     recognised = true;
+    seenWords.push(...result.words);
     const accepted =
       result.score >= MIN_ACCEPT_SCORE && (accept ? accept(result.text) : true);
     if (result.score > bestAny.score) bestAny = result;
@@ -595,6 +997,46 @@ export async function runOcr(
   // tail, where the number read straight out of a pass is not to be trusted.
   const settledInFastPath = settled;
 
+  // Stage 2.5: the ROI crop. The passes above have said where the label is, even
+  // where they failed to read it (see `deriveLabelRoi`); crop to that and try
+  // again with the text at a size the recogniser handles, which is the only way
+  // the resolution round 8 showed is needed fits the budget.
+  //
+  // It runs before the refinement ladder on purpose. On the images it helps, the
+  // ladder's five full-frame passes are ~1-2s of work that ends in nothing, and
+  // two crop passes cost ~160ms; when the crop answers, the ladder is skipped
+  // altogether. When it does not, nothing below has changed.
+  let cropVoted: string | undefined;
+  if (!signal?.aborted) {
+    const imageWidth = image.naturalWidth || image.width;
+    const imageHeight = image.naturalHeight || image.height;
+    const roi = deriveLabelRoi(seenWords, imageWidth, imageHeight);
+    if (roi && shouldCropToRoi({ settled, roi, imageWidth, imageHeight })) {
+      const cropCandidates: (string | null)[] = [];
+      for (const cropPass of CROP_PASSES) {
+        if (signal?.aborted) break;
+        const result = await attempt(
+          {
+            maxDim: DEFAULT_MAX_DIM,
+            rotation: orientation,
+            boostContrast: cropPass.boostContrast,
+            crop: { rect: roi.rect, scale: cropPassScale(roi, cropPass.targetWordHeight) },
+          },
+          'crop'
+        );
+        if (result && voteCandidate) cropCandidates.push(voteCandidate(result.text));
+      }
+      // Corroboration, exactly as the digit vote demands it: one crop pass
+      // reading a number is a guess, two passes at different scales and different
+      // contrast reading the *same* number is an answer. Measured 7/10 of round
+      // 8's ROI-bearing failures and 19/19 of its controls, with no wrong number.
+      const [first, second] = cropCandidates;
+      if (cropCandidates.length === CROP_PASSES.length && first !== null && first === second) {
+        cropVoted = first;
+      }
+    }
+  }
+
   // Stage 3: refine at whichever orientation won. With no orientation signal at
   // all this stays upright, which is the right prior.
   if (!settled) {
@@ -625,8 +1067,17 @@ export async function runOcr(
   // not corroborate each other — see `shouldVoteOnDigits`, which is where the
   // measurement behind that lives. A fast-path answer is not self-evidently
   // right: 9 of round 6's 11 wrong numbers were fast-path answers.
-  let voted: string | null | undefined;
+  //
+  // Unless the crop stage already settled it. Two corroborating reads of a label
+  // rendered at a size the recogniser can handle beat five full-frame sweeps of a
+  // digit row eight pixels tall — and the full-frame vote is not merely useless
+  // there, it is harmful: on R008 the boosted primary pass read the number
+  // correctly, the vote could not see it at all, its passes disagreed, and the
+  // field was blanked. Skipping it when the crop agreed is what keeps that
+  // answer.
+  let voted: string | null | undefined = cropVoted;
   if (
+    cropVoted === undefined &&
     voteCandidate &&
     shouldVoteOnDigits({ settledInFastPath, primaryCandidates }) &&
     recognised &&
