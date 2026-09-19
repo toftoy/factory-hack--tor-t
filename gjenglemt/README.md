@@ -113,7 +113,10 @@ utviklingsomgivelsen:
       fylle inn Sted manuelt uten å henge seg opp, både på forsiden og
       på bekreftelsesskjermen
 - [ ] "Nytt funn" på meldingsskjermen fører deg tilbake til kameraet
-      for neste gjenstand uten å be om posisjonstillatelse på nytt
+      for neste gjenstand uten å be om posisjonstillatelse på nytt, og
+      Sted-feltet på forsiden starter forhåndsutfylt med forrige
+      gjenstands sted (ikke tomt) — trykk "Hent sted" for å hente en
+      fersk posisjon hvis du har flyttet deg
 - [ ] Etter at meldingen er åpnet automatisk, sjekk at "Åpne melding"
       fortsatt fungerer manuelt hvis du retter et felt og vil sende på
       nytt

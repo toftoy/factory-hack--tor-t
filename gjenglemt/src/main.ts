@@ -151,6 +151,16 @@ let sessionLiveCoords: Promise<Coords | null> | null = null;
  */
 let lastGeolocationFailure: GeolocationFailure | null = null;
 
+/**
+ * The last address a location lookup actually resolved, independent of which
+ * item it was for. "Nytt funn" (see `renderConfirmScreen`) starts the next
+ * item's Sted from this instead of blank — sorting several items in the same
+ * spot is the common case, so re-deriving the same address from scratch each
+ * time is friction, not correctness. "Hent sted" is the deliberate way to
+ * override it when the user actually has moved.
+ */
+let lastResolvedSted: string | null = null;
+
 function fetchLiveCoordsOnce(): Promise<Coords | null> {
   lastGeolocationFailure = null;
   return withTimeout(
@@ -317,6 +327,7 @@ function startLocationLookup(): PendingLocation {
 function backfillLocation(value: string | null): void {
   confirmFields?.setStedSettled();
   if (!value) return;
+  lastResolvedSted = value;
   if (state.sted !== '') return;
   state.sted = value;
   confirmFields?.setSted(value);
@@ -375,7 +386,9 @@ function renderCaptureButton(): HTMLElement {
     state.photo = file;
     state.lastCaptureAt = Date.now();
     state.ocr = startNoteOcr(file);
-    state.location = startLocationLookup();
+    // Don't discard a lookup "Hent sted" already started for this item with a
+    // redundant second one — same rule `analyze()` falls back on below.
+    state.location = state.location ?? startLocationLookup();
     hasCapturedBefore = true;
     state.screen = 'analyzing';
     render();
@@ -415,6 +428,13 @@ function renderCaptureButton(): HTMLElement {
  * first is what makes Sted actually make it into that auto-sent message
  * instead of coming up empty every time.
  *
+ * Also the deliberate way to refresh Sted after moving: "Nytt funn" (see
+ * `renderConfirmScreen`) starts the next item's Sted from `lastResolvedSted`
+ * rather than blank, since sorting several items in one spot is the common
+ * case — but that means nothing else re-checks the position once it has been
+ * resolved once. A button press here always forces a fresh GPS fix and
+ * overwrites Sted with the result.
+ *
  * Also doubles as a manual override: some browsers' geolocation bridge on iOS
  * is simply broken (confirmed on a real device — hangs with no response at
  * all in Vivaldi and Chrome, works fine in Safari, a per-browser bug outside
@@ -441,14 +461,19 @@ function renderLocationButton(): HTMLElement {
   button.addEventListener('click', () => {
     status.hidden = false;
     status.textContent = 'Henter posisjon …';
-    const pending = state.location ?? (state.location = startLocationLookup());
-    void pending.value.then((value) => {
+    // A deliberate button press means "get my position now" — forces a fresh
+    // GPS fix (not the session-cached one) and always overwrites Sted with
+    // the result, whether that field was still carrying the previous item's
+    // value or something the user typed. This is the tool for "I moved since
+    // last time"; the automatic per-photo lookup below keeps the cached fix
+    // and never overwrites a field that already has something in it.
+    sessionLiveCoords = null;
+    state.location = startLocationLookup();
+    void state.location.value.then((value) => {
       if (value) {
         status.textContent = 'Posisjon hentet.';
-        // `backfillLocation` already set state.sted, unless the user had
-        // already typed something here themselves — either way, reflect
-        // whatever state.sted actually ended up holding.
-        stedInput.value = state.sted;
+        state.sted = value;
+        stedInput.value = value;
       } else {
         status.textContent =
           `Fant ikke posisjon (${describeGeolocationFailure(lastGeolocationFailure)}). ` +
@@ -749,7 +774,9 @@ function renderConfirmScreen(): HTMLElement {
   newFind.textContent = 'Nytt funn';
   // Resets everything about this item but keeps `sessionLiveCoords`, so the
   // next item's location lookup reuses the same GPS fix instead of asking for
-  // permission and a fix all over again.
+  // permission and a fix all over again. Sted itself starts from
+  // `lastResolvedSted` rather than blank — sorting several items in the same
+  // spot is the common case, and "Hent sted" is there for when it isn't.
   newFind.addEventListener('click', () => {
     state.screen = 'capture';
     state.photo = null;
@@ -757,7 +784,7 @@ function renderConfirmScreen(): HTMLElement {
     state.location = null;
     state.navn = '';
     state.telefon = '';
-    state.sted = '';
+    state.sted = lastResolvedSted ?? '';
     state.melding = '';
     state.meldingDirty = false;
     state.diagnostics = emptyDiagnostics();
