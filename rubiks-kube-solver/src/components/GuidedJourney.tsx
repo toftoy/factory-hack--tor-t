@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
-import { TRACKS } from '../cube/algorithms';
-import { SOLVED_PAUSE_MS, type AlgorithmTraining } from '../hooks/useAlgorithmTraining';
+import { GUIDED_STAGES } from '../cube/guidedJourney';
+import { SOLVED_PAUSE_MS } from '../hooks/useAlgorithmTraining';
+import type { GuidedJourney as GuidedJourneyState } from '../hooks/useGuidedJourney';
 
 interface Props {
-  training: AlgorithmTraining;
+  journey: GuidedJourneyState;
   onExit: () => void;
   onResetCamera: () => void;
 }
 
-// How long a tap-to-arm confirm button stays armed before reverting on its
-// own, if the second (confirming) tap never comes.
 const CONFIRM_ARM_MS = 3000;
 
 function formatTime(ms: number): string {
@@ -36,14 +35,9 @@ function Confetti() {
   );
 }
 
-export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
-  const { phase, track, progress, lastResult, giveUp, skip, resetTrack } = training;
+export function GuidedJourney({ journey, onExit, onResetCamera }: Props) {
+  const { phase, stageIndex, lastResult, giveUp, skip, resetJourney } = journey;
 
-  // Resetting progress is destructive (wipes earned stars), so it needs a
-  // real confirmation - but window.confirm() doesn't reliably work inside a
-  // sandboxed iframe (e.g. the Claude Artifact viewer), so this is a
-  // same-page tap-to-arm pattern instead: first tap arms it (and shows what
-  // a second tap will do), second tap within CONFIRM_ARM_MS actually resets.
   const [resetArmed, setResetArmed] = useState(false);
   useEffect(() => {
     if (!resetArmed) return;
@@ -54,16 +48,12 @@ export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
   const handleResetTap = () => {
     if (resetArmed) {
       setResetArmed(false);
-      resetTrack();
+      resetJourney();
     } else {
       setResetArmed(true);
     }
   };
 
-  // The celebration has its own fixed duration, independent of the phase
-  // machine - the next case's setup animation can be near-instant (a
-  // single-move notation case, say), which would otherwise cut "Riktig!"
-  // off before a kid has any chance to see it.
   const [celebrating, setCelebrating] = useState(false);
   useEffect(() => {
     if (!lastResult) return;
@@ -72,19 +62,23 @@ export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
     return () => clearTimeout(timer);
   }, [lastResult]);
 
-  if (phase.kind === 'idle' || !track || !progress) return null;
+  if (phase.kind === 'idle') return null;
 
-  if (phase.kind === 'track-complete') {
+  if (phase.kind === 'journey-complete') {
     return (
       <div className="training-hud">
         <Confetti />
         <div className="training-complete-card">
           <div className="training-complete-emoji">🏆</div>
-          <div className="training-complete-title">Sporet er fullført!</div>
-          <div className="training-complete-subtitle">Du klarte alle {TRACKS[track].length} casene. Kjempebra jobbet!</div>
+          <div className="training-complete-title">Du løste kuben fra bunnen av!</div>
+          <div className="training-complete-subtitle">Alle {GUIDED_STAGES.length} stegene er unnagjort. Kjempebra jobbet!</div>
+          <div className="training-complete-subtitle">
+            Nå kan du metoden! Prøv den på din egen kube - eller bruk Skann og Løs (under «For viderekomne») hvis du
+            trenger hjelp med en ekte blanding.
+          </div>
           <div className="training-complete-actions">
-            <button onClick={resetTrack} className="training-skip-btn">
-              🔄 Prøv igjen
+            <button onClick={resetJourney} className="training-skip-btn">
+              🔄 Løs en ny kube
             </button>
             <button onClick={onExit} className="training-exit training-complete-exit">
               ✕ Avslutt
@@ -96,9 +90,7 @@ export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
   }
 
   const algCase = phase.algCase;
-  const stats = progress.stats[algCase.id];
-  const caseCount = TRACKS[track].length;
-  const caseNumber = progress.currentIndex + 1;
+  const stage = GUIDED_STAGES[stageIndex];
   const showCelebration = celebrating && Boolean(lastResult);
 
   return (
@@ -106,20 +98,23 @@ export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
       {showCelebration && <Confetti />}
 
       <div className="training-header">
-        <div className="training-progress-dots">
-          {Array.from({ length: caseCount }, (_, i) => (
+        <div className="journey-stage-icons">
+          {GUIDED_STAGES.map((s, i) => (
             <span
-              key={i}
+              key={s.id}
               className={
-                'training-dot' +
-                (i < progress.currentIndex ? ' training-dot-done' : '') +
-                (i === progress.currentIndex ? ' training-dot-current' : '')
+                'journey-stage-icon' +
+                (i < stageIndex ? ' journey-stage-icon-done' : '') +
+                (i === stageIndex ? ' journey-stage-icon-current' : '')
               }
-            />
+              title={s.title}
+            >
+              {s.icon}
+            </span>
           ))}
         </div>
         <span className="training-case-name">
-          {algCase.name} <span className="training-case-number">({caseNumber}/{caseCount})</span>
+          {stage.title} <span className="training-case-number">({stageIndex + 1}/{GUIDED_STAGES.length})</span>
         </span>
         <button onClick={onResetCamera} className="training-reset" aria-label="Nullstill kameravisning">
           🧭
@@ -151,10 +146,7 @@ export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
         </div>
 
         <div className="training-footer">
-          <span className="training-streak-stars">
-            {'⭐'.repeat(stats?.streak ?? 0)}
-            {'☆'.repeat(3 - (stats?.streak ?? 0))}
-          </span>
+          <span className="training-case-number">Steg {stageIndex + 1} av {GUIDED_STAGES.length}</span>
           <div className="training-actions">
             <button
               className="training-help-btn"
@@ -175,7 +167,7 @@ export function TrainingWizard({ training, onExit, onResetCamera }: Props) {
               onClick={handleResetTap}
               disabled={phase.kind === 'demonstrating'}
             >
-              {resetArmed ? 'Sikker? 🗑️' : '🗑️ Nullstill'}
+              {resetArmed ? 'Sikker? 🗑️' : '🗑️ Start på nytt'}
             </button>
           </div>
         </div>

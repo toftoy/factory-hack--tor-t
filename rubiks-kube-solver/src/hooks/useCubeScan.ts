@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { sampleGridColors, type GridBounds } from '../cube/gridSampler';
+import { sampleGridColors, type GridQuad } from '../cube/gridSampler';
 import { assembleScan, resolveAmbiguousScan, type AssembleResult } from '../cube/scanAssembly';
 import { FACE_ORDER } from '../cube/facelets';
 import type { FaceLetter } from '../cube/moveEngine';
@@ -63,11 +63,11 @@ export function useCubeScan() {
   }, []);
 
   const confirmStep = useCallback(
-    (ctx: CanvasRenderingContext2D, bounds: GridBounds) => {
+    (ctx: CanvasRenderingContext2D, quad: GridQuad) => {
       setPhase((prev) => {
         if (prev.kind !== 'capturing') return prev;
         const face = CAPTURE_ORDER[prev.stepIndex];
-        const grid = sampleGridColors(ctx, bounds);
+        const grid = sampleGridColors(ctx, quad);
         const nextCaptured = { ...captured, [face]: grid };
         setCaptured(nextCaptured);
 
@@ -98,10 +98,10 @@ export function useCubeScan() {
   );
 
   const confirmD = useCallback(
-    (ctx: CanvasRenderingContext2D, bounds: GridBounds) => {
+    (ctx: CanvasRenderingContext2D, quad: GridQuad) => {
       setPhase((prev) => {
         if (prev.kind !== 'capturingD') return prev;
-        const dGrid = sampleGridColors(ctx, bounds);
+        const dGrid = sampleGridColors(ctx, quad);
         const result = resolveAmbiguousScan(
           {
             F: captured.F!,
