@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torus Hero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy-950: #040a18;
+    --navy-900: #071330;
+    --navy-700: #12285a;
+    --orange: #ff8a3d;
+    --orange-soft: #ffb37a;
+    --ink: #f4ede4;
+    --ink-dim: #a9b4cc;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--navy-950); color: var(--ink); font-family: Inter, system-ui, sans-serif; }
+
+  .hero { position: relative; min-height: 100vh; overflow: hidden; display: grid; align-items: center; }
+  #bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .hero::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(90deg, rgba(4,10,24,.55) 0%, rgba(4,10,24,.15) 45%, transparent 65%); }
+
+  .content { position: relative; z-index: 2; padding: 0 clamp(16px, 7vw, 120px); max-width: 720px; }
+  .eyebrow { font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--orange-soft); }
+  h1 { font-family: Fraunces, Georgia, serif; font-weight: 300; font-size: clamp(44px, 7vw, 96px); line-height: 1; margin: 20px 0 24px; }
+  h1 em { font-style: italic; color: var(--orange); }
+  p.lead { font-size: clamp(16px, 1.4vw, 19px); line-height: 1.6; color: var(--ink-dim); max-width: 46ch; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+  .btn { font: 500 15px Inter, sans-serif; padding: 14px 24px; border-radius: 999px; text-decoration: none; }
+  .btn-primary { background: var(--orange); color: var(--navy-950); }
+  .btn-ghost { color: var(--ink); border: 1px solid rgba(244,237,228,.3); backdrop-filter: blur(6px); }
+  @media (max-aspect-ratio: 9/10) {
+    .hero { align-items: end; }
+    .content { padding-bottom: 56px; }
+    .hero::after { background: linear-gradient(0deg, rgba(4,10,24,.75) 0%, rgba(4,10,24,.3) 45%, transparent 62%); }
+  }
+</style>
+</head>
+<body>
+<section class="hero">
+  <canvas id="bg"></canvas>
+  <div class="content">
+    <div class="eyebrow">Studio for form og lys</div>
+    <h1>Vi former <em>lyset</em> du ser</h1>
+    <p class="lead">Digitale overflater med dybde, materialfølelse og ro. Bygget for merkevarer som vil bli husket.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="#">Se arbeidene</a>
+      <a class="btn btn-ghost" href="#">Ta kontakt</a>
+    </div>
+  </div>
+</section>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('bg');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+camera.position.set(0, 0, 9);
+
+/* ---------- Studio-HDRI: generert miljø med varme og kalde lyspaneler ---------- */
+function makeEnvironment() {
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.SphereGeometry(20, 32, 16),
+    new THREE.MeshBasicMaterial({ color: '#0a1636', side: THREE.BackSide })));
+  const panel = (color, intensity, w, h, pos) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
+    m.position.set(...pos); m.lookAt(0, 0, 0); env.add(m);
+  };
+  panel('#ff6a1a', 5, 16, 10, [-9, 5, 5]);   // stor varm softbox
+  panel('#ffb070', 4, 2, 16, [10, 1, -3]);   // varm stripe bak (gir rimlys)
+  panel('#2f86ff', 0.9, 14, 6, [5, -8, 5]);  // svak kald (azur) fyll nedenfra
+  panel('#ffffff', 10, 10, 0.5, [0, 10, 1]); // tynn hvit topp-stripe
+  panel('#ffffff', 6, 0.35, 10, [-10, 0, -4]); // hvit kantstripe
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const tex = pmrem.fromScene(env, 0.08).texture;
+  pmrem.dispose();
+  return tex;
+}
+scene.environment = makeEnvironment();
+
+/* ---------- Tåke-bakgrunn (shader-plan i scenen, så glasset bryter den) ---------- */
+const bgUniforms = { uTime: { value: 0 }, uAspect: { value: 1 }, uFocus: { value: new THREE.Vector2(0.68, 0.5) } };
+const bg = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+  uniforms: bgUniforms, depthWrite: false,
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
+  fragmentShader: `
+    precision highp float;
+    varying vec2 vUv; uniform float uTime, uAspect; uniform vec2 uFocus;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+      return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+    float fbm(vec2 p){ float v=0., a=.5; for(int i=0;i<6;i++){ v+=a*n(p); p=p*2.03+vec2(1.7,9.2); a*=.5; } return v; }
+    void main(){
+      vec2 uv = vUv; vec2 p = (uv - .5) * vec2(uAspect, 1.);
+      float t = uTime * .02;
+      float q = fbm(p * 1.6 + vec2(t, -t));
+      float c = fbm(p * 2.2 + q * 1.8 + vec2(-t * .7, t));
+      vec3 navyDeep = vec3(.004,.012,.04), navy = vec3(.02,.065,.2), navyHi = vec3(.07,.2,.5);
+      vec3 col = mix(navyDeep, navy, smoothstep(.3,.75,c));
+      col = mix(col, navyHi, smoothstep(.68,.92,c) * .45);
+      // egen sky-maske for oransje, så fargene ligger side om side i stedet for å grumse
+      vec2 f = (uFocus - .5) * vec2(uAspect, 1.);
+      float d = length(p - f);
+      float w = fbm(p * 2.6 - q * 1.4 + vec2(t * .5, 3.1));
+      float warm = smoothstep(.46, .72, w) * exp(-d * d * 4.5);
+      vec3 ember = mix(vec3(.55,.12,.02), vec3(1.,.48,.14), smoothstep(.55,.85,w));
+      col = mix(col, ember, warm * .85);
+      col += vec3(1.,.42,.1) * exp(-d * d * 12.) * .3;    // varm kjerne bak torusen
+      float dust = step(.9965, h(floor(uv * vec2(uAspect, 1.) * 900.))) * smoothstep(.4,.8,c);
+      col += vec3(1.,.8,.6) * dust * .5;
+      float vig = smoothstep(1.1, .2, length((uv - .5) * vec2(uAspect * .7, 1.)));
+      col *= mix(.15, 1., vig);
+      col += (h(uv * 1000. + fract(uTime)) - .5) * .035;  // film-korn
+      gl_FragColor = vec4(max(col, 0.), 1.);
+      #include <colorspace_fragment>
+    }`
+}));
+bg.position.z = -6;
+bg.renderOrder = -1;
+scene.add(bg);
+
+/* ---------- Glass-torus ---------- */
+const torus = new THREE.Mesh(
+  new THREE.TorusGeometry(1.4, 0.55, 96, 256),
+  new THREE.MeshPhysicalMaterial({
+    color: '#ffffff', metalness: 0, roughness: 0.04,
+    transmission: 1, thickness: 0.7, ior: 1.5, dispersion: 0.8,
+    attenuationColor: new THREE.Color('#ffcfa3'), attenuationDistance: 5,
+    clearcoat: 1, clearcoatRoughness: 0.05,
+    specularIntensity: 1, envMapIntensity: 1.3,
+  })
+);
+torus.rotation.x = 0.7;            // ca. 40° vipp: hullet er alltid synlig
+const rig = new THREE.Group();     // roterer rundt synsaksen
+rig.add(torus);
+scene.add(rig);
+
+const key = new THREE.DirectionalLight('#ffb37a', 1.5);
+key.position.set(-4, 5, 5);
+scene.add(key);
+const rim = new THREE.DirectionalLight('#5b8cff', 1.2);
+rim.position.set(5, -2, -4);
+scene.add(rim);
+
+/* ---------- Støvpartikler ---------- */
+const N = 600, pos = new Float32Array(N * 3);
+for (let i = 0; i < N; i++) {
+  pos[i*3] = (Math.random() - .5) * 16; pos[i*3+1] = (Math.random() - .5) * 10; pos[i*3+2] = (Math.random() - .5) * 6 - 1;
+}
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  color: '#ffc796', size: 0.025, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending,
+}));
+scene.add(dust);
+
+/* ---------- Layout etter skjermformat ---------- */
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  const portrait = w / h < 0.9;
+  const visH = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z;
+  const visW = visH * camera.aspect;
+  // bakgrunnsplan dekker hele synsfeltet på sin dybde
+  const s = (camera.position.z - bg.position.z) / camera.position.z;
+  bg.scale.set(visW * s * 1.02, visH * s * 1.02, 1);
+  bgUniforms.uAspect.value = camera.aspect;
+  if (portrait) {
+    rig.position.set(0, visH * 0.24, 0);
+    rig.scale.setScalar(Math.min(0.85, visW / 5.2));
+    bgUniforms.uFocus.value.set(0.5, 0.74);
+  } else {
+    rig.position.set(visW * 0.2, 0, 0);
+    rig.scale.setScalar(1);
+    bgUniforms.uFocus.value.set(0.7, 0.5);
+  }
+}
+addEventListener('resize', resize);
+resize();
+
+const clock = new THREE.Clock();
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+renderer.setAnimationLoop(() => {
+  const t = reduce ? 0 : clock.getElapsedTime();
+  rig.rotation.z = t * 0.12;
+  torus.rotation.y = Math.sin(t * 0.21) * 0.25;
+  dust.rotation.y = t * 0.01;
+  bgUniforms.uTime.value = t;
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
