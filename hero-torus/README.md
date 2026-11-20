@@ -7,5 +7,5 @@ lyspaneler. Bakgrunnen er en tåke-shader i marineblått og oransje som glasset 
 
 Åpne `index.html` direkte i en nettleser. Respekterer `prefers-reduced-motion`.
 
-`process/` har skjermbilder fra hver iterasjon (r0 = start, r1–r4 = forbedringsrunder),
+`process/` har skjermbilder fra hver iterasjon (r0 = start, r1–r7 = forbedringsrunder; `-t20` = etter 20 s rotasjon),
 desktop 1440×900 og mobil 390×844.
